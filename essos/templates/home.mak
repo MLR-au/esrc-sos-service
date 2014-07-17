@@ -23,10 +23,15 @@
                 <h4>Single Sign on Service</h4>
             </div>
         </div>
-        <hr/>
         <div class="row">
             <div class="col-sm-12 col-md-12 col-lg-12 text-center">
-                <p>You came from: <a href="https://ohrm.esrc.info">https://ohrm.esrc.info</a></p>
+                %if r != '':
+                    <hr/>
+                    <p>You came from: <a href="${r}">${r}</a></p>
+                %endif
+                %if e == 'True':
+                    <div class="alert alert-danger small">Sorry - we couldn't log you in. Please try again.</div>
+                %endif
             </div>
         </div>
         <hr/>
@@ -35,11 +40,12 @@
                 <h4 class="text-center">Staff</h4>
                 <hr/>
                 <form role="form" action="/login/staff" method="POST">
+                    <input type="hidden" name="r" value="${r}" >
                     <div class="form-group">
-                        <input type="username" name="username" class="form-control" placeholder="Enter your eSRC username">
+                        <input type="username" name="username" class="form-control" placeholder="Enter your eSRC username" required>
                     </div>
                     <div class="form-group">
-                        <input type="password" name="password" class="form-control" placeholder="Password">
+                        <input type="password" name="password" class="form-control" placeholder="Password" required>
                     </div>
                     <button class="btn btn-default btn-block">Login</button>
                 </form>
@@ -50,12 +56,14 @@
                 <h4 class="text-center">Collaborators</h4>
                 <hr/>
                 <form role="form" action="/login/google" method="POST">
+                    <input type="hidden" name="r" value="${r}" >
                     <button class="btn btn-default btn-block" type="submit">
                         <img src="/static/img/google.jpg" style="height: 20px;"/>&nbsp;Login with your Google account
                     </button>
                 </form>
                 <br/>
                 <form role="form" action="/login/linkedin" method="POST">
+                    <input type="hidden" name="r" value="${r}" >
                     <button class="btn btn-default btn-block" type="submit">
                         <img src="/static/img/linkedin.png" style="height: 20px;"/>&nbsp;Login with your LinkedIn account
                     </button>
