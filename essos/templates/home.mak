@@ -34,13 +34,14 @@
             <div class="col-sm-6 col-md-6 col-lg-6">
                 <h4 class="text-center">Staff</h4>
                 <hr/>
-                <form role="form">
+                <form role="form" action="/login/staff" method="POST">
                     <div class="form-group">
-                        <input type="username" class="form-control" placeholder="Enter your eSRC username">
+                        <input type="username" name="username" class="form-control" placeholder="Enter your eSRC username">
                     </div>
                     <div class="form-group">
-                        <input type="password" class="form-control" placeholder="Password">
+                        <input type="password" name="password" class="form-control" placeholder="Password">
                     </div>
+                    <button class="btn btn-default btn-block">Login</button>
                 </form>
                 <hr/>
                 <p class="text-muted">Staff should login using their eSRC user account and password.</p>
