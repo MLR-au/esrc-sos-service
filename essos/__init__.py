@@ -11,6 +11,7 @@ def main(global_config, **settings):
     config.add_static_view('static', 'static', cache_max_age=3600)
 
     config.add_route('home', '/')
+    config.add_route('health_check', '/health-check')
     config.add_route('login_staff', '/login/staff')
     config.add_route('login_google', '/login/google')
     config.add_route('login_linkedin', '/login/linkedin')
