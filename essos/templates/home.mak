@@ -42,10 +42,23 @@
                         <input type="password" class="form-control" placeholder="Password">
                     </div>
                 </form>
+                <hr/>
                 <p class="text-muted">Staff should login using their eSRC user account and password.</p>
             </div>
             <div class="col-sm-6 col-md-6 col-lg-6">
                 <h4 class="text-center">Collaborators</h4>
+                <hr/>
+                <form role="form" action="/login/google" method="POST">
+                    <button class="btn btn-default btn-block" type="submit">
+                        <img src="/static/img/google.jpg" style="height: 20px;"/>&nbsp;Login with your Google account
+                    </button>
+                </form>
+                <br/>
+                <form role="form" action="/login/linkedin" method="POST">
+                    <button class="btn btn-default btn-block" type="submit">
+                        <img src="/static/img/linkedin.png" style="height: 20px;"/>&nbsp;Login with your LinkedIn account
+                    </button>
+                </form>
                 <hr/>
                 <p class="text-muted">Please login with one of the supported external authentication providers. Note
                 that this will not automatically grant you access if this is your first time here. 
