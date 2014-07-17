@@ -30,8 +30,8 @@
             </div>
         </div>
         <hr/>
-        <div class="row" style="border: 2px solid grey; border-radius: 8px;">
-            <div class="col-sm-6 col-md-6 col-lg-6" style="border-right: 1px solid grey;">
+        <div class="row" style="border: 2px solid grey; border-radius: 8px; margin: 1px;">
+            <div class="col-sm-6 col-md-6 col-lg-6">
                 <h4 class="text-center">Staff</h4>
                 <hr/>
                 <form role="form">
