@@ -3,7 +3,7 @@ from pyramid.paster import setup_logging
 
 from config import Config as appConfig
 
-from Connectors import CassandraBackend
+from connectors import CassandraBackend
 
 def init_cassandra_connection(conf):
     arguments = {
