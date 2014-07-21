@@ -59,13 +59,14 @@ class LDAP:
         """
         data = []
         try:
-            ldap_filter = '(&(ObjectClass=Person)(uid=' + username + '))'
-            data = self.conn.search_st(self.base, ldap.SCOPE_SUBTREE, ldap_filter, [ 'uid' ], timeout=self.LDAP_TIMEOUT)
+            ldap_filter = '(&(objectClass=Person)(uid=' + username + '))'
+            data = self.conn.search_st(self.base, ldap.SCOPE_SUBTREE, ldap_filter, [ ], 0, timeout=self.LDAP_TIMEOUT)
         except:
             print "**", sys.exc_info()
 
         if data != []:
             dn = data[0][0]
+            self.data = data[0][1]
             try:
                 self.conn.bind_s(dn, password)
             except ldap.INVALID_CREDENTIALS:
@@ -74,6 +75,7 @@ class LDAP:
                 return False
             else:
                 # hooray - user found and correct pass provided
+                self.groups = self.get_user_groups(username)
                 log.info("User: %s authenticated successfully" % username)
                 return True
 
@@ -81,5 +83,17 @@ class LDAP:
         log.info("No such user: %s" % username)
         return False
 
+    def get_user_data(self):
+        return (self.data['uid'][0], self.data['cn'][0], self.groups)
 
+    def get_user_groups(self, username):
+        self.conn.simple_bind_s(self.binduser, self.bindpass)
+        data = []
+        try:
+            ldap_filter = '(&(objectClass=posixGroup)(memberUid=' + username + '))'
+            data = self.conn.search_st(self.base, ldap.SCOPE_SUBTREE, ldap_filter, [ 'cn' ], 0, timeout=self.LDAP_TIMEOUT)
+        except:
+            print "**", sys.exc_info()
 
+        groups = [ g[1]['cn'][0] for g in data ] 
+        return groups
