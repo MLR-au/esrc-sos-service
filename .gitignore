@@ -1,2 +1,3 @@
 config
 essos.egg-info/*
+essos/.coverage
