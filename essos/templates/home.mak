@@ -8,7 +8,7 @@
     <meta name="author" content="Pylons Project">
     <link rel="shortcut icon" href="${request.static_url('essos:static/pyramid-16x16.png')}">
 
-    <title>Starter Scaffold for The Pyramid Web Framework</title>
+    <title>eSRC Single Sign on Service (ESSOS)</title>
 
     <!-- Bootstrap core CSS -->
     <link href="/static/bootstrap.min.css" rel="stylesheet">
