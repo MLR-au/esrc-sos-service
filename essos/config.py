@@ -7,7 +7,7 @@ from pyramid.httpexceptions import HTTPBadRequest
 
 class Config:
 
-    def __init__(self, request):
+    def __init__(self, conf):
         """
         Expects to be called with a pyramid request object.
 
@@ -21,10 +21,12 @@ class Config:
         request: a pyramid request object
         """
         self.cfg = ConfigParser.SafeConfigParser()
-        self.cfg.read(request.registry.settings['app.config'])
+        self.cfg.read(conf)
 
         self.app_config = {
             'general': {
+                'admins': self.get('General', 'admins', True),
+                'session_lifetime': self.get('General', 'session_lifetime'),
             },
             'ldap': {
                 'servers': self.get('LDAP', 'ldap_servers', True),
@@ -35,7 +37,8 @@ class Config:
             'cassandra': {
                 'user': self.get('CASSANDRA', 'user'),
                 'pass': self.get('CASSANDRA', 'pass'),
-                'nodes': self.get('CASSANDRA', 'nodes', True)
+                'nodes': self.get('CASSANDRA', 'nodes', True),
+                'keyspace': self.get('CASSANDRA', 'keyspace', True)
             }
         }
 
@@ -43,5 +46,5 @@ class Config:
     def get(self, section, param, aslist=False):
         data = self.cfg.get(section, param) if (self.cfg.has_section(section) and self.cfg.has_option(section, param)) else None
         if aslist:
-            return data.split(',')
+            return [ d.strip() for d in data.split(',') ]
         return data
