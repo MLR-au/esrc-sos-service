@@ -7,7 +7,7 @@ from pyramid.httpexceptions import (
 import auth
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 import logging
 log = logging.getLogger()
@@ -26,12 +26,14 @@ def health_check(request):
 
     # do we have a working connection to cassandra
     session = CSession(request)
-    resp = session.execute('SELECT * FROM essos.session;');
 
     # add a trace into the health_check table
-    orm = ORM(session, 'essos', 'health_check')
+    orm = ORM(session)
     t2 = time.time() - t1
-    orm.insert([ 'id', 'timestamp', 'request_time'], [ uuid.uuid4(), datetime.utcnow(), t2 ])
+    orm.insert('health_check',
+        [ 'date', 'timestamp', 'request_time'], 
+        [ str(date.today()), datetime.utcnow(), t2 ]
+    )
 
     return 'OK'
 
@@ -78,7 +80,7 @@ def login_staff(request):
 
     # and create a session for them
     session_lifetime = int(request.registry.app_config['general']['session_lifetime'])
-    orm = ORM(session, 'essos', 'session')
+    orm = ORM(session, 'session')
     orm.insert(
         [ 'id', 'expiration', 'username', 'fullname', 'is_admin' ], 
         [uuid.uuid4(), (datetime.utcnow() + timedelta(minutes=session_lifetime)), user_data[0], user_data[1], isAdmin]
