@@ -11,10 +11,10 @@ def CSession(request):
 class Models:
     def __init__(self, session):
         self.session = session
-        self.create_session_table()
-        self.create_user_profile_table()
+        self.create_session_tables()
+        #self.create_user_profile_table()
         self.create_health_check_table()
-        self.create_logging()
+        #self.create_logging()
 
     def create(self, table_def):
         try:
@@ -27,22 +27,28 @@ class Models:
             else:
                 print sys.exc_info()
             
-
-    def create_session_table(self):
+    def create_session_tables(self):
         table_def = """
-        CREATE TABLE essos.session (
-            id          uuid PRIMARY KEY,
-            expiration  timestamp,
-            username    text,
-            fullname    text,
-            is_admin    boolean 
+        CREATE TABLE IF NOT EXISTS session_by_token (
+            "token"     uuid PRIMARY KEY,
+            "username"  varchar,
+            "fullname"  varchar,
+            "is_admin"  boolean
+        );
+        """
+        self.create(table_def)
+
+        table_def = """
+        CREATE TABLE IF NOT EXISTS session_by_name (
+            "username"  varchar PRIMARY KEY,
+            "token"     uuid
         );
         """
         self.create(table_def)
 
     def create_user_profile_table(self):
         table_def = """
-        CREATE TABLE essos.profile (
+        CREATE TABLE IF NOT EXISTS profile (
             id              uuid PRIMARY KEY,
             fullname        text, 
             primary_email   text,
@@ -53,55 +59,64 @@ class Models:
 
     def create_health_check_table(self):
         table_def = """
-        CREATE TABLE essos.health_check (
-            id              uuid PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS health_check (
+            date            text,
             timestamp       timestamp,
-            request_time    float 
-        );
+            request_time    float,
+            PRIMARY KEY (date, timestamp)
+        )
+        WITH CLUSTERING ORDER BY (timestamp DESC);
         """
         self.create(table_def)
 
     def create_logging(self):
         table_def = """
-        CREATE TABLE essos.logging (
-            id              uuid PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS logging (
+            id              uuid,
             timestamp       timestamp,
             source          text,
-            message         text
-        );
+            message         blob,
+            PRIMARY KEY (id, timestamp)
+        )
+        WITH CLUSTERING ORDER BY (timestamp ASC);
         """
         self.create(table_def)
 
         index_def = """
-        CREATE INDEX logging_source ON essos.logging (source);
+        CREATE INDEX ON logging (source);
         """
         self.create(index_def)
 
-
 class ORM:
-    def __init__(self, session, keyspace, table):
+    def __init__(self, session):
         self.session = session
-        self.keyspace = keyspace 
-        self.table = table
 
-    def insert(self, fields, data):
+    def _validate_list(self, field, name):
+        if type(field) != list:
+            raise TypeError("%s must be of type list" % name)
+
+    def insert(self, table=[], fields=[], data=[], ttl=None):
         log.debug('ORM::insert')
 
         # rudimentary error checking
-        if type(fields) != list or type(data) != list:
-            log.error('ORM::insert: fields and data params must be of type list')
+        self._validate_list(fields, 'fields')
+        self._validate_list(data, 'data')
         if len(fields) != len(data):
-            log.error('ORM::insert: ensure the number of elements in data is the same as the number in fields')
+            raise ValueError('fields and data arrays must be the same length')
 
         # create the placeholder array
         p = [ '?' for f in range(0, len(fields)) ]
 
         # concatenate the fields array
-        fields = ', '.join(fields)
-        log.debug("ORM::insert: %s into: %s" % (fields, self.table))
+        fields = ', '.join([ '"%s"' % f for f in fields ])
+        log.debug("ORM::insert: %s into: %s" % (fields, table))
 
         # create the prepared statement
-        statement = "INSERT INTO %s.%s (%s) VALUES (%s);" % (self.keyspace, self.table, fields, ', '.join(p))
+        statement = "INSERT INTO %s (%s) VALUES (%s)" % (table, fields, ', '.join(p))
+        if ttl is not None:
+            statement += ' USING TTL ' + ttl + ';'
+        else:
+            statement += ';'
         log.debug("ORM::insert: prepared statement: %s" % statement)
         prepared_statement = self.session.prepare(statement)
 
@@ -109,9 +124,40 @@ class ORM:
         self.session.execute(prepared_statement, data)
 
         pass
+
     def update(self, field, value, where):
         pass
-    def query(self, fields, where):
 
-        pass
+    def query(self, table='', fields=[], where=[]):
+        log.debug('ORM::query')
+        
+        # rudimentary error checking
+        self._validate_list(fields, 'fields')
+        self._validate_list(where, 'where')
+
+        # concatenate the fields array
+        fields = ', '.join([ '"%s"' % f for f in fields ])
+        log.debug("ORM::query: %s from: %s" % (fields, table))
+
+
+        # create the prepared statement
+        statement = "SELECT %s FROM %s" % (fields, table)
+        if len(where) != 0:
+            # concatenate the where clauses
+            wheres = ' AND '.join(where)
+            statement += " WHERE %s;" % wheres
+        else:
+            statement += ';'
+
+        log.debug("ORM::insert: prepared statement: %s" % statement)
+
+        # execute the statement and return the result
+        return self.session.execute(statement)
+
+
+
+
+
+
+
 
