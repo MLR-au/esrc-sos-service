@@ -26,5 +26,22 @@ Then navigate to http://{IP OF YOUR DEV SERVER}:3000
 
 ## Running the tests
     cd essos
-    nosetests -v --with-cov --cov-report term-missing
+    PYTHONPATH=$PWD nosetests -v --with-cov --cov-report term-missing -s
+
+    or to run a specific test (for example):
+    PYTHONPATH=$PWD nosetests -v --with-cov --cov-report term-missing -s tests/test_health_check_view.py
+
+
+    * PYTHONPATH: set the path modules to be included. You probably don't need
+    to change this.
+    * -v: verbose
+    * --with-cov --cov-report term-missing: calculate unit test coverage showing what's
+    not covered.
+    * -s: don't capture stdout
+
+
+### Test requirements
+Tests assume there is a local ldap server with a group "essos" and two users: u1 and u2 with passes
+p1 and p2 respectively (obviously not real user accounts). u1 is in the essos group which makes u1
+an app administrator.
 
