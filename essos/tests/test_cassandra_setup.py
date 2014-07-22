@@ -11,7 +11,7 @@ from connectors import CassandraBackend
 import cassandra
 from models import *
 import time
-from datetime import datetime
+from datetime import datetime, date
 import uuid
 
 import os
@@ -51,31 +51,32 @@ class CassandraTests(unittest.TestCase):
         d = 'dummy'
         with self.assertRaises(TypeError):
             orm.insert('session_by_token',
-                fields = 'token expire',
+                fields = 'token',
                 data = [ t, d ]
             )
         with self.assertRaises(TypeError):
             orm.insert('session_by_token',
-                fields = [ 'token', 'expire' ],
+                fields = [ 'token', 'username' ],
                 data = "t and d" 
             )
         with self.assertRaises(ValueError):
             orm.insert('session_by_token',
-                fields = [ 'token', 'expire' ],
+                fields = [ 'token', 'userna,e' ],
                 data = [ d ]
             )
+
     def test_orm_query_bad_call(self):
         orm = ORM(self.session)
         t = 'dummy'
         d = 'dummy'
         with self.assertRaises(TypeError):
             orm.query('session_by_token',
-                fields = 'token expire',
+                fields = 'token',
                 where = [ t, d ]
             )
         with self.assertRaises(TypeError):
             orm.query('session_by_token',
-                fields = [ 'token', 'expire' ],
+                fields = [ 'token', 'username' ],
                 where= "t and d" 
             )
         
@@ -83,19 +84,18 @@ class CassandraTests(unittest.TestCase):
         orm = ORM(self.session)
 
         t = uuid.uuid4()
-        d = datetime.utcnow()
         username = 'test'
         fullname = 'Test User'
         orm.insert('session_by_token',
-            fields = [ 'token', 'expire', 'fullname', 'username', 'is_admin' ],
-            data = [ t, d, fullname, username, True]
+            fields = [ 'token', 'fullname', 'username', 'is_admin' ],
+            data = [ t, fullname, username, True]
         )
         orm.insert('session_by_name',
             fields = [ 'username', 'token' ],
             data = [ username, t ]
         )
         data = orm.query('session_by_token',
-            [ 'token', 'username', 'expire' ],
+            [ 'token', 'username' ],
             [ '"token" = ' +  str(t) ]
         )
         self.assertEqual(1, len(data))
@@ -109,3 +109,16 @@ class CassandraTests(unittest.TestCase):
         )
         for row in data:
             self.assertEqual(t, row.token)
+
+    def test_orm_insert_with_ttl(self):
+        orm = ORM(self.session)
+
+        orm.insert('health_check',
+            fields = [ 'date', 'timestamp', 'request_time' ],
+            data = [ str(date.today()), datetime.utcnow(), 0.34],
+            ttl = '30'
+        )
+        data = orm.query('health_check',
+            fields = [ 'timestamp', 'request_time' ],
+        ) 
+        
