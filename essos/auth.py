@@ -1,6 +1,7 @@
 #
 import ldap
 import sys
+import collections
 
 import logging
 log = logging.getLogger('essos')
@@ -84,7 +85,8 @@ class LDAP:
         return False
 
     def get_user_data(self):
-        return (self.data['uid'][0], self.data['cn'][0], self.groups)
+        user_data = collections.namedtuple('UserData', 'username, fullname, groups')
+        return user_data(self.data['uid'][0], self.data['cn'][0], self.groups)
 
     def get_user_groups(self, username):
         self.conn.simple_bind_s(self.binduser, self.bindpass)
