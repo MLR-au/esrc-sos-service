@@ -38,7 +38,7 @@ class Config:
                 'user': self.get('CASSANDRA', 'user'),
                 'pass': self.get('CASSANDRA', 'pass'),
                 'nodes': self.get('CASSANDRA', 'nodes', True),
-                'keyspace': self.get('CASSANDRA', 'keyspace', True)
+                'keyspace': self.get('CASSANDRA', 'keyspace')
             }
         }
 
