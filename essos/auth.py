@@ -40,6 +40,10 @@ class LDAP:
                 log.debug("Server down: %s" % s)
                 self.conn = None
                 pass
+            except ldap.LDAPError:
+                # it's not looking good love
+                log.debug("Error talking to: %s" % s)
+                self.conn = None
 
     def authenticate(self, username, password):
         """Authenticate the user
