@@ -4,6 +4,8 @@ from pyramid.httpexceptions import (
     HTTPInternalServerError,
     HTTPForbidden
 )
+from pyramid.response import Response
+import ast
 
 import auth
 import time
@@ -40,6 +42,14 @@ def health_check(request):
 
 @view_config(route_name='home', renderer='templates/home.mak')
 def home(request):
+    # is a user with a valid session trying to log in?
+    check = _check_user_known(request)
+    if check:
+        if check.is_admin:
+            raise HTTPFound('/admin')
+        else:
+            raise HTTPFound('/profile')
+
     r = ''
     if request.GET.has_key('r'):
         r = request.GET['r']
@@ -59,6 +69,16 @@ def home(request):
 
 @view_config(route_name='login_staff', renderer='json')
 def login_staff(request):
+    check = _check_user_known(request)
+    if check:
+        if check.is_admin:
+            raise HTTPFound('/admin')
+        else:
+            raise HTTPFound('/profile')
+    else:
+        if not request.POST.get('username') and not request.POST.get('pasword'):
+            raise HTTPFound('/')
+
     lc = request.registry.app_config['ldap']
     ldap = auth.LDAP(lc['servers'], lc['base'], lc['binduser'], lc['bindpass'])
     result = ldap.authenticate(request.POST['username'], request.POST['password'])
@@ -87,22 +107,85 @@ def login_staff(request):
 
     # and create a session for them
     session_lifetime = int(request.registry.app_config['general']['session_lifetime'])
+    cookie_secure = ast.literal_eval(request.registry.app_config['general']['cookie.secure'])
     expire = datetime.utcnow() + timedelta(session_lifetime)
+    token = uuid.uuid4()
+    domain = request.registry.app_config['general']['cookie.domain']
+    path = '/'
+    if r:
+        domain = r
+
     orm = ORM(session)
     orm.insert('session_by_token',
-        fields = [ 'token', 'expire', 'username', 'fullname', 'is_admin' ], 
-        data = [uuid.uuid4(), expire, user_data[0], user_data[1], isAdmin],
+        fields = [ 'token', 'expire', 'username', 'fullname', 'is_admin', 'domain', 'path' ], 
+        data = [token, expire, user_data[0], user_data[1], isAdmin, domain, path],
         ttl = session_lifetime
     )
 
+    orm.insert('session_by_name',
+        fields = [ 'token', 'username' ],
+        data = [ token, user_data[0] ],
+        ttl = session_lifetime
+    )
+    # set the cookie
+    request.response.set_cookie('EAT', str(token), 
+        domain=domain, path=path, 
+        secure=cookie_secure, httponly=True)
+
     # send the user on: either back to where they came
-    #  from (if r is not not None) or on to their profile page
+    #  from (if r is not None) or on to their profile page
     if r:
-        raise HTTPFound(r)
+        raise HTTPFound(r, headers=request.response.headers)
     else:
-        raise HTTPFound('/profile')
+        if isAdmin:
+            raise HTTPFound("/admin", headers=request.response.headers)
+        else:
+            raise HTTPFound('/profile', headers=request.response.headers)
 
+@view_config(route_name="admin", renderer='templates/admin.mak')
+def admin(request):
+    check = _check_user_known(request)
+    if check:
+        if not check.is_admin:
+            raise HTTPFound('/profile')
+    else:
+        raise HTTPFound('/')
 
+    return {}
+
+@view_config(route_name="logout")
+def logout(request):
+    check = _check_user_known(request)
+    if not check:
+        log.debug('not logged in')
+        raise HTTPFound('/')
+    else:
+        session = CSession(request)
+        orm = ORM(session)
+        orm.delete('session_by_token',
+            where = [ "\"token\" = %s" % check.token ])
+        request.response.delete_cookie('EAT', path=check.path, domain=check.domain)
+
+    raise HTTPFound('/', headers=request.response.headers)
+
+def _check_user_known(request):
+    # is there a token in the request?
+    token = request.cookies.get('EAT')
+    if token is None:
+        return False
+
+    # is the token still valid?
+    session = CSession(request)
+    orm = ORM(session)
+    data = orm.query('session_by_token',
+        where = [ "\"token\" = %s" % token ] 
+    )
+    if not data:
+        return False
+
+    # if we get to here then the user is known
+    #   so we return the data we have about them.
+    return data[0]
 
 
 
