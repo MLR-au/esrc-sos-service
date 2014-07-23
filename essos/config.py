@@ -1,9 +1,13 @@
 
 import os
+import sys
 import os.path
 import ConfigParser
 
 from pyramid.httpexceptions import HTTPBadRequest
+
+import logging
+log = logging.getLogger('essos')
 
 class Config:
 
@@ -21,12 +25,19 @@ class Config:
         request: a pyramid request object
         """
         self.cfg = ConfigParser.SafeConfigParser()
-        self.cfg.read(conf)
+        try:
+            self.cfg.read(conf)
+        except ConfigParser.ParsingError:
+            log.error('Config file parsing errors')
+            log.error(sys.exc_info()[1])
+            sys.exit()
 
         self.app_config = {
             'general': {
                 'admins': self.get('General', 'admins', True),
                 'session_lifetime': self.get('General', 'session_lifetime'),
+                'cookie.domain': self.get('General', 'cookie.domain'),
+                'cookie.secure': self.get('General', 'cookie.secure'),
             },
             'ldap': {
                 'servers': self.get('LDAP', 'ldap_servers', True),
