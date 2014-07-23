@@ -1,7 +1,8 @@
 from pyramid.view import view_config
 from pyramid.httpexceptions import (
     HTTPFound,
-    HTTPInternalServerError
+    HTTPInternalServerError,
+    HTTPForbidden
 )
 
 import auth
@@ -45,10 +46,16 @@ def home(request):
 
     e = False
     if request.GET.has_key('e'):
-        e = request.GET['e']
+        e = True
 
-    log.info("Login redirect from: '%s', remote address: %s" % (r, request.environ['REMOTE_ADDR']))
-    return { 'r': r, 'e': e }
+    try:
+        # if REMOTE_ADDR is not set in the environment then we have to wonder what the
+        #  hell is going in. So - if we get an exception here, then the except clause
+        #  is to raise a forbidden error.
+        log.info("Login redirect from: '%s', remote address: %s" % (r, request.environ['REMOTE_ADDR']))
+        return { 'r': r, 'e': e }
+    except:
+        raise HTTPForbidden
 
 @view_config(route_name='login_staff', renderer='json')
 def login_staff(request):
@@ -56,13 +63,13 @@ def login_staff(request):
     ldap = auth.LDAP(lc['servers'], lc['base'], lc['binduser'], lc['bindpass'])
     result = ldap.authenticate(request.POST['username'], request.POST['password'])
     try:
-        r = request.POST['r']
+        r = request.GET['r']
     except KeyError:
         r = None
 
     # if not result means they didn't auth successfully so send
     #  them back to the start (to try again) with a marker (e=True)
-    #  noting that something is wrong.
+    #  to flag that something is wrong.
     if not result and r:
         raise HTTPFound("/?r=%s&e=True")
     elif not result:
@@ -80,20 +87,21 @@ def login_staff(request):
 
     # and create a session for them
     session_lifetime = int(request.registry.app_config['general']['session_lifetime'])
-    orm = ORM(session, 'session')
-    orm.insert(
-        [ 'id', 'expiration', 'username', 'fullname', 'is_admin' ], 
-        [uuid.uuid4(), (datetime.utcnow() + timedelta(minutes=session_lifetime)), user_data[0], user_data[1], isAdmin]
+    expire = datetime.utcnow() + timedelta(session_lifetime)
+    orm = ORM(session)
+    orm.insert('session_by_token',
+        fields = [ 'token', 'expire', 'username', 'fullname', 'is_admin' ], 
+        data = [uuid.uuid4(), expire, user_data[0], user_data[1], isAdmin],
+        ttl = session_lifetime
     )
 
     # send the user on: either back to where they came
-    #  from (if r is not not None) or on their profile page
+    #  from (if r is not not None) or on to their profile page
     if r:
         raise HTTPFound(r)
     else:
         raise HTTPFound('/profile')
 
-    return {}
 
 
 
