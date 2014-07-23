@@ -137,9 +137,11 @@ class ORM:
         self._validate_list(where, 'where')
 
         # concatenate the fields array
-        fields = ', '.join([ '"%s"' % f for f in fields ])
+        if len(fields) == 0:
+            fields = '*'
+        else:
+            fields = ', '.join([ '"%s"' % f for f in fields ])
         log.debug("ORM::query: %s from: %s" % (fields, table))
-
 
         # create the prepared statement
         statement = "SELECT %s FROM %s" % (fields, table)
