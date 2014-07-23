@@ -32,16 +32,18 @@ class Models:
         CREATE TABLE IF NOT EXISTS session_by_token (
             "token"     uuid PRIMARY KEY,
             "expire"    timestamp,
-            "username"  varchar,
-            "fullname"  varchar,
-            "is_admin"  boolean
+            "username"  text,
+            "fullname"  text,
+            "is_admin"  boolean,
+            "domain"    text,
+            "path"      text
         );
         """
         self.create(table_def)
 
         table_def = """
         CREATE TABLE IF NOT EXISTS session_by_name (
-            "username"  varchar PRIMARY KEY,
+            "username"  text PRIMARY KEY,
             "token"     uuid
         );
         """
@@ -152,7 +154,34 @@ class ORM:
         else:
             statement += ';'
 
-        log.debug("ORM::insert: prepared statement: %s" % statement)
+        log.debug("ORM::query: prepared statement: %s" % statement)
+
+        # execute the statement and return the result
+        return self.session.execute(statement)
+
+    def delete(self, table='', fields=[], where=[]):
+        log.debug('ORM::delete')
+        
+        # rudimentary error checking
+        self._validate_list(fields, 'fields')
+        self._validate_list(where, 'where')
+
+        # concatenate the fields array
+        if len(fields) == 0:
+            fields = ''
+        else:
+            fields = ', '.join([ '"%s"' % f for f in fields ])
+        log.debug("ORM::delete: %s from: %s" % (fields, table))
+
+        # create the prepared statement
+        statement = "DELETE %s FROM %s" % (fields, table)
+        if len(where) != 0:
+            # concatenate the where clauses
+            wheres = ' AND '.join(where)
+            statement += " WHERE %s;" % wheres
+        else:
+            statement += ';'
+        log.debug("ORM::delete: prepared statement: %s" % statement)
 
         # execute the statement and return the result
         return self.session.execute(statement)
