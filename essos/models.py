@@ -31,6 +31,7 @@ class Models:
         table_def = """
         CREATE TABLE IF NOT EXISTS session_by_token (
             "token"     uuid PRIMARY KEY,
+            "expire"    timestamp,
             "username"  varchar,
             "fullname"  varchar,
             "is_admin"  boolean
@@ -114,7 +115,7 @@ class ORM:
         # create the prepared statement
         statement = "INSERT INTO %s (%s) VALUES (%s)" % (table, fields, ', '.join(p))
         if ttl is not None:
-            statement += ' USING TTL ' + ttl + ';'
+            statement += " USING TTL %s;" % ttl 
         else:
             statement += ';'
         log.debug("ORM::insert: prepared statement: %s" % statement)
