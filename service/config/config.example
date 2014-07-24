@@ -5,6 +5,9 @@
 ##   into a python list
 admins:             admins-group1, admin-group2
 
+## Admin app. The url to the admin console.
+admin_app:          https://admin.example.com
+
 ## This is the lifetime of the session in seconds
 session_lifetime:   300
  
@@ -13,9 +16,6 @@ session_lifetime:   300
 ##  in this folder (relative to current path). See app-config.example for example
 ##  configurations.
 apps:               apps
-
-## Admin app. The url to the admin console.
-admin_app:          https://admin.example.com
 
 ## Cookie configuration. Set the domain to the domain of this service and ensure
 ##  the admin app is on the same domain.
@@ -52,3 +52,7 @@ nodes:      IP.host1, IP.host2, IP.host3
 user:       username
 pass:       password
 keyspace:   keyspace_name
+
+
+
+
