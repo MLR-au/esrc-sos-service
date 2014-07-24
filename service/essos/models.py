@@ -35,8 +35,6 @@ class Models:
             "username"  text,
             "fullname"  text,
             "is_admin"  boolean,
-            "domain"    text,
-            "path"      text
         );
         """
         self.create(table_def)
