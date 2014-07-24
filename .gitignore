@@ -3,3 +3,8 @@ config/config
 config/apps
 service/essos.egg-info/*
 service/essos/.coverage
+node_modules
+admin/dist
+admin/.tmp
+admin/.sass-cache
+admin/app/bower_components
