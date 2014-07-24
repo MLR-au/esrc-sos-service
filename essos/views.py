@@ -142,17 +142,6 @@ def login_staff(request):
         else:
             raise HTTPFound('/profile', headers=request.response.headers)
 
-@view_config(route_name="admin", renderer='templates/admin.mak')
-def admin(request):
-    check = _check_user_known(request)
-    if check:
-        if not check.is_admin:
-            raise HTTPFound('/profile')
-    else:
-        raise HTTPFound('/')
-
-    return {}
-
 @view_config(route_name="logout")
 def logout(request):
     check = _check_user_known(request)
