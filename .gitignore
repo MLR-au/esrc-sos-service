@@ -1,3 +1,4 @@
-config
+config/config
+config/apps
 essos.egg-info/*
 essos/.coverage
