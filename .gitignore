@@ -1,4 +1,5 @@
+*.pyc
 config/config
 config/apps
-essos.egg-info/*
-essos/.coverage
+service/essos.egg-info/*
+service/essos/.coverage
