@@ -6,10 +6,10 @@
 admins:             admins-group1, admin-group2
 
 ## Admin app. The url to the admin console.
-admin_app:          https://admin.example.com
+admin.app:          https://admin.example.com
 
 ## This is the lifetime of the session in seconds
-session_lifetime:   300
+session.lifetime:   300
  
 ## App specific configuration: The service is designed to be used by other
 ##  apps - ala OAuth2 model - the allowed apps are expected to have a configuration
@@ -17,28 +17,20 @@ session_lifetime:   300
 ##  configurations.
 apps:               apps
 
-## Cookie configuration. Set the domain to the domain of this service and ensure
-##  the admin app is on the same domain.
-##
-## Unless developing (when you're probably using http) cookie.secure should be set
-##  to True
-cookie.domain:      example.com
-cookie.secure:      True
-
 [LDAP]
 ## LDAP Configuration
 ##  ldap_servers should be a comma separated list of ldap URI's
 ##  e.g. ldap://host1.DOMAIN, ldap://host2.DOMAIN
 ##
 ##  The app will convert this into a list and try them in sequence 
-ldap_servers:   ldap://ldap04.internal, ldap://ldap01.internal
+ldap.servers:   ldap://server1.example.com, ldap://server2.example.com
 
 ## The search base
-search_base:    o=mygroup,dc=example,dc=com
+search.base:    o=mygroup,dc=example,dc=com
 
 ## The user with which to bind to the tree: must be a DN
-bind_user:      cn=user,ou=people,o=mygroup,dc=example,dc=com
-bind_pass:      supersekrit
+bind.user:      cn=user,ou=people,o=mygroup,dc=example,dc=com
+bind.pass:      supersekrit
 
 [CASSANDRA]
 ## CASSANDRA Configuration
