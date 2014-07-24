@@ -1,6 +1,6 @@
 *.pyc
-config/config
-config/apps
+service/config/config
+service/config/apps
 service/essos.egg-info/*
 service/essos/.coverage
 node_modules
