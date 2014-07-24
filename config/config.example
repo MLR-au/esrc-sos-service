@@ -1,0 +1,54 @@
+#
+[General]
+## The LDAP group(s) whose members are considered admins of the app
+##   This should be a comman separated list of groups which will be turned
+##   into a python list
+admins:             admins-group1, admin-group2
+
+## This is the lifetime of the session in seconds
+session_lifetime:   300
+ 
+## App specific configuration: The service is designed to be used by other
+##  apps - ala OAuth2 model - the allowed apps are expected to have a configuration
+##  in this folder (relative to current path). See app-config.example for example
+##  configurations.
+apps:               apps
+
+## Admin app. The url to the admin console.
+admin_app:          https://admin.example.com
+
+## Cookie configuration. Set the domain to the domain of this service and ensure
+##  the admin app is on the same domain.
+##
+## Unless developing (when you're probably using http) cookie.secure should be set
+##  to True
+cookie.domain:      example.com
+cookie.secure:      True
+
+[LDAP]
+## LDAP Configuration
+##  ldap_servers should be a comma separated list of ldap URI's
+##  e.g. ldap://host1.DOMAIN, ldap://host2.DOMAIN
+##
+##  The app will convert this into a list and try them in sequence 
+ldap_servers:   ldap://ldap04.internal, ldap://ldap01.internal
+
+## The search base
+search_base:    o=mygroup,dc=example,dc=com
+
+## The user with which to bind to the tree: must be a DN
+bind_user:      cn=user,ou=people,o=mygroup,dc=example,dc=com
+bind_pass:      supersekrit
+
+[CASSANDRA]
+## CASSANDRA Configuration
+##  nodes: At least a couple of the cassandra nodes in the cluster. The client
+##   retrieves the topology of the cluster from any node which it can connect to
+##   so having at least a couple of nodes in the list will guard against node failure.
+## This is a comma separated list and it will be turned into a python list by the app
+nodes:      IP.host1, IP.host2, IP.host3
+
+## The user, password and keyspace to use
+user:       username
+pass:       password
+keyspace:   keyspace_name
