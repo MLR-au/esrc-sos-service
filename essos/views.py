@@ -10,14 +10,18 @@ import ast
 import auth
 import time
 import uuid
+import os
+import os.path
 from datetime import datetime, timedelta, date
+from urlparse import urlparse
 
 import logging
 log = logging.getLogger()
 
 from models import CSession, ORM
+from config import AppsConfig
 
-@view_config(route_name="health_check", renderer="string")
+@view_config(route_name="health_check", request_method="GET", renderer="string")
 def health_check(request):
     t1 = time.time()
 
@@ -40,19 +44,13 @@ def health_check(request):
 
     return 'OK'
 
-@view_config(route_name='home', renderer='templates/home.mak')
+@view_config(route_name='home', request_method="GET", renderer='templates/home.mak')
 def home(request):
-    # is a user with a valid session trying to log in?
-    check = _check_user_known(request)
-    if check:
-        if check.is_admin:
-            raise HTTPFound('/admin')
-        else:
-            raise HTTPFound('/profile')
-
     r = ''
     if request.GET.has_key('r'):
         r = request.GET['r']
+        if not _validate_app_redirect(request, r):
+            raise HTTPFound('/')
 
     e = False
     if request.GET.has_key('e'):
@@ -67,25 +65,19 @@ def home(request):
     except:
         raise HTTPForbidden
 
-@view_config(route_name='login_staff', renderer='json')
+@view_config(route_name='login_staff', request_method="POST", renderer='json')
 def login_staff(request):
-    check = _check_user_known(request)
-    if check:
-        if check.is_admin:
-            raise HTTPFound('/admin')
-        else:
-            raise HTTPFound('/profile')
-    else:
-        if not request.POST.get('username') and not request.POST.get('pasword'):
-            raise HTTPFound('/')
+    if not request.POST.get('username') and not request.POST.get('pasword'):
+        raise HTTPFound('/')
 
     lc = request.registry.app_config['ldap']
     ldap = auth.LDAP(lc['servers'], lc['base'], lc['binduser'], lc['bindpass'])
     result = ldap.authenticate(request.POST['username'], request.POST['password'])
-    try:
-        r = request.GET['r']
-    except KeyError:
-        r = None
+
+    r = request.POST['r']
+    if r != '':
+        if not _validate_app_redirect(request, r):
+            raise HTTPFound('/')
 
     # if not result means they didn't auth successfully so send
     #  them back to the start (to try again) with a marker (e=True)
@@ -105,76 +97,74 @@ def login_staff(request):
         if g in user_data[2]:
             isAdmin = True
 
-    # and create a session for them
-    session_lifetime = int(request.registry.app_config['general']['session_lifetime'])
-    cookie_secure = ast.literal_eval(request.registry.app_config['general']['cookie.secure'])
-    expire = datetime.utcnow() + timedelta(session_lifetime)
-    token = uuid.uuid4()
-    domain = request.registry.app_config['general']['cookie.domain']
-    path = '/'
-    if r:
-        domain = r
-
+    # if they already have a session, just send them on
     orm = ORM(session)
-    orm.insert('session_by_token',
-        fields = [ 'token', 'expire', 'username', 'fullname', 'is_admin', 'domain', 'path' ], 
-        data = [token, expire, user_data[0], user_data[1], isAdmin, domain, path],
-        ttl = session_lifetime
+    data = orm.query('session_by_name',
+        where = [ "\"username\" = '%s'" % user_data.username ]
     )
+    if data:
+        # there's already a session going - use that token
+        token = data[0].token
+    else:
+        # no current session so create a token for them
+        session_lifetime = int(request.registry.app_config['general']['session.lifetime'])
+        expire = datetime.utcnow() + timedelta(session_lifetime)
+        token = uuid.uuid4()
 
-    orm.insert('session_by_name',
-        fields = [ 'token', 'username' ],
-        data = [ token, user_data[0] ],
-        ttl = session_lifetime
-    )
-    # set the cookie
-    request.response.set_cookie('EAT', str(token), 
-        domain=domain, path=path, 
-        secure=cookie_secure, httponly=True)
+        orm.insert('session_by_token',
+            fields = [ 'token', 'expire', 'username', 'fullname', 'is_admin', ], 
+            data = [token, expire, user_data[0], user_data[1], isAdmin ],
+            ttl = session_lifetime
+        )
+
+        orm.insert('session_by_name',
+            fields = [ 'token', 'username' ],
+            data = [ token, user_data[0] ],
+            ttl = session_lifetime
+        )
 
     # send the user on: either back to where they came
     #  from (if r is not None) or on to their profile page
     if r:
-        raise HTTPFound(r, headers=request.response.headers)
+        raise HTTPFound("%s#token=%s" % (r, token))
     else:
         if isAdmin:
-            raise HTTPFound("/admin", headers=request.response.headers)
+            raise HTTPFound("%s#token=%s" % (request.registry.app_config['general']['admin.app'], token))
         else:
-            raise HTTPFound('/profile', headers=request.response.headers)
+            raise HTTPFound('/profile')
 
-@view_config(route_name="logout")
+@view_config(route_name="logout", request_method="GET")
 def logout(request):
-    check = _check_user_known(request)
-    if not check:
-        log.debug('not logged in')
-        raise HTTPFound('/')
-    else:
+    token = request.GET['token']
+    if token is not None:
+        # ditch the server side token
         session = CSession(request)
         orm = ORM(session)
-        orm.delete('session_by_token',
-            where = [ "\"token\" = %s" % check.token ])
-        request.response.delete_cookie('EAT', path=check.path, domain=check.domain)
+        
+        # get the data associated with the user
+        data = orm.query('session_by_token',
+            where=[ "\"token\" = %s" % token ]
+        )
+        if data:
+            orm.delete('session_by_token',
+                where = [ "\"token\" = %s" % token ])
+            orm.delete('session_by_name',
+                where = [ "\"username\" = '%s'" % data.username ])
 
-    raise HTTPFound('/', headers=request.response.headers)
+    raise HTTPFound('/')
 
-def _check_user_known(request):
-    # is there a token in the request?
-    token = request.cookies.get('EAT')
-    if token is None:
-        return False
+def _validate_app_redirect(request, r):
+    app_configs = os.path.join(os.path.dirname(request.registry.settings['app.config']), request.registry.app_config['general']['apps'])
+    apps = {}
+    for f in os.listdir(app_configs):
+        c = AppsConfig(os.path.join(app_configs, f))
+        d = c.load()
+        apps[d.name] = d.url
+ 
+    authed_app = False
+    for k, v in apps.items():
+        if r.find(v) != -1:
+            authed_app = True
 
-    # is the token still valid?
-    session = CSession(request)
-    orm = ORM(session)
-    data = orm.query('session_by_token',
-        where = [ "\"token\" = %s" % token ] 
-    )
-    if not data:
-        return False
-
-    # if we get to here then the user is known
-    #   so we return the data we have about them.
-    return data[0]
-
-
+    return authed_app
 
