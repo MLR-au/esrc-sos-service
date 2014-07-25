@@ -50,6 +50,8 @@ class Config(ConfigBase):
                 'admin.app': self.get('General', 'admin.app'),
                 'apps': self.get('General', 'apps'),
                 'session.lifetime': self.get('General', 'session.lifetime'),
+                'cookie.domain': self.get('General', 'cookie.domain'),
+                'cookie.secure': self.get('General', 'cookie.secure')
             },
             'ldap': {
                 'servers': self.get('LDAP', 'ldap.servers', aslist=True),
