@@ -49,8 +49,9 @@ def home(request):
     r = ''
     if request.GET.has_key('r'):
         r = request.GET['r']
-        if not _validate_app_redirect(request, r):
-            raise HTTPFound('/')
+        if r != request.registry.app_config['general']['admin.app']:
+            if not _validate_app_redirect(request, r):
+                raise HTTPFound('/')
 
     e = False
     if request.GET.has_key('e'):
@@ -72,9 +73,9 @@ def home(request):
 
 @view_config(route_name='login_staff', request_method="POST", renderer='json')
 def login_staff(request):
-
+    
     check = _check_user_known(request)
-    if not request.POST.get('username') and not request.POST.get('pasword') and not check:
+    if (not request.POST.get('username') and not request.POST.get('pasword')) and not check:
         raise HTTPFound('/')
 
     lc = request.registry.app_config['ldap']
@@ -82,7 +83,7 @@ def login_staff(request):
     result = ldap.authenticate(request.POST['username'], request.POST['password'])
 
     r = request.POST.get('r')
-    if r is not None:
+    if r != '':
         if not _validate_app_redirect(request, r):
             raise HTTPFound('/')
 
@@ -149,8 +150,9 @@ def login_staff(request):
     # send the user on
     _move_the_user_on(request, r, data[0])
 
-@view_config(route_name="logout", request_method="GET")
+@view_config(route_name="logout", request_method="GET", renderer='jsonp')
 def logout(request):
+    log.debug('logout called')
     check = _check_user_known(request)
     if check:
         # ditch the server side token
@@ -161,10 +163,14 @@ def logout(request):
         orm.delete('session_by_name',
             where = [ "\"username\" = '%s'" % check.username ])
 
-    raise HTTPFound('/')
+    return { 'session': 'closed' }
 
-@view_config(route_name="retrieve_token", request_method="GET", renderer='json')
+@view_config(route_name="retrieve_token", request_method="GET", renderer='jsonp')
 def retrieve_token(request):
+
+    # ensure services on other domains can get to this method
+    request.response.headers['Access-Control-Allow-Origin'] = '*'
+
     code = request.matchdict.get('code')
     session = CSession(request)
     orm = ORM(session)
@@ -172,14 +178,18 @@ def retrieve_token(request):
         where = [ "\"code\" = %s" % code ]
     )
     if data:
-        orm.delete('session_by_code',
-            where = [ "\"code\" = %s" % code ]
-        )
+        #orm.delete('session_by_code',
+        #    where = [ "\"code\" = %s" % code ]
+        #)
         return { 'token': str(data[0].token) }
-    return { 'token': '' }
+    return { 'token': None }
 
-@view_config(route_name="validate_token", request_method="POST", renderer='json')
+@view_config(route_name="validate_token", request_method="POST", renderer='jsonp')
 def validate_token(request):
+
+    # ensure services on other domains can get to this method
+    request.response.headers['Access-Control-Allow-Origin'] = '*'
+
     token = request.matchdict.get('token')
     session = CSession(request)
     orm = ORM(session)
