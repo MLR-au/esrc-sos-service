@@ -12,6 +12,7 @@ from pyramid.httpexceptions import (
 import sys
 import os
 import os.path
+from config import Config
 
 import os
 here = os.path.dirname(__file__)
@@ -21,6 +22,9 @@ class HomeViewTests(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp()
         self.request = testing.DummyRequest()
+        self.request.registry.settings['app.config'] = settings['app.config']
+        conf = Config(settings['app.config'])
+        self.request.registry.app_config = conf.app_config
 
     def tearDown(self):
         testing.tearDown()
@@ -39,8 +43,8 @@ class HomeViewTests(unittest.TestCase):
         self.request.GET = {
             'r': 'https://ohrm.esrc.info'
         }
-        h = home(self.request)
-        self.assertEqual(h['r'], 'https://ohrm.esrc.info')
+        with self.assertRaises(HTTPFound):
+            h = home(self.request)
 
         self.request.GET = {
             'e': True
