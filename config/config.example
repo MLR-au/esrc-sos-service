@@ -17,6 +17,14 @@ session.lifetime:   300
 ##  configurations.
 apps:               apps
 
+## Cookie configuration. Set the domain to the domain of this service and ensure
+##  the admin app is on the same domain.
+##
+# Unless developing (when you're probably using http) cookie.secure should be set
+##  to True
+cookie.domain:      example.com
+cookie.secure:      True
+
 [LDAP]
 ## LDAP Configuration
 ##  ldap_servers should be a comma separated list of ldap URI's
