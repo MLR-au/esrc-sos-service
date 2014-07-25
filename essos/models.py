@@ -19,8 +19,6 @@ class Models:
     def create(self, table_def):
         try:
             self.session.execute(table_def)
-        except cassandra.AlreadyExists:
-            pass
         except cassandra.InvalidRequest:
             if str(sys.exc_info()[1]) == 'code=2200 [Invalid query] message="Index already exists"':
                 pass
@@ -31,6 +29,7 @@ class Models:
         table_def = """
         CREATE TABLE IF NOT EXISTS session_by_token (
             "token"     uuid PRIMARY KEY,
+            "code"      uuid,
             "expire"    timestamp,
             "username"  text,
             "fullname"  text,
@@ -42,7 +41,15 @@ class Models:
         table_def = """
         CREATE TABLE IF NOT EXISTS session_by_name (
             "username"  text PRIMARY KEY,
-            "token"     uuid
+            "token"     uuid,
+        );
+        """
+        self.create(table_def)
+
+        table_def = """
+        CREATE TABLE IF NOT EXISTS session_by_code (
+            "code"      uuid PRIMARY KEY,
+            "token"     uuid,
         );
         """
         self.create(table_def)
