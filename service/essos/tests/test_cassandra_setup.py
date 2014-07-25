@@ -84,28 +84,39 @@ class CassandraTests(unittest.TestCase):
         orm = ORM(self.session)
 
         t = uuid.uuid4()
+        c = uuid.uuid4()
         username = 'test'
         fullname = 'Test User'
         orm.insert('session_by_token',
-            fields = [ 'token', 'fullname', 'username', 'is_admin' ],
-            data = [ t, fullname, username, True]
+            fields = [ 'token', 'code', 'fullname', 'username', 'is_admin' ],
+            data = [ t, c, fullname, username, True]
         )
         orm.insert('session_by_name',
             fields = [ 'username', 'token' ],
             data = [ username, t ]
         )
+        orm.insert('session_by_code',
+            fields = [ 'code', 'token' ],
+            data = [ c, t ]
+        )
         data = orm.query('session_by_token',
-            [ 'token', 'username' ],
-            [ '"token" = ' +  str(t) ]
+            fields = [ 'token', 'username' ],
+            where = [ '"token" = ' +  str(t) ]
         )
         self.assertEqual(1, len(data))
         for row in data:
             self.assertEqual(t, row.token)
             self.assertEqual(username, row.username)
 
+        data = orm.query('session_by_token',
+            where = [ '"token" = ' +  str(t) ]
+        )
+        for row in data:
+            self.assertEqual(t, row.token)
+
         data = orm.query('session_by_name',
-            [ 'token' ],
-            [ '"username" = \'mlarosa\'' ]
+            fields = [ 'token' ],
+            where = [ '"username" = \'mlarosa\'' ]
         )
         for row in data:
             self.assertEqual(t, row.token)
@@ -122,3 +133,16 @@ class CassandraTests(unittest.TestCase):
             fields = [ 'timestamp', 'request_time' ],
         ) 
         
+    def test_orm_delete(self):
+        orm = ORM(self.session)
+        t = uuid.uuid4()
+        c = uuid.uuid4()
+        username = 'test'
+        fullname = 'test user'
+        orm.insert('session_by_token',
+            fields = [ 'token', 'code', 'fullname', 'username', 'is_admin' ],
+            data = [ t, c, fullname, username, True]
+        )
+        orm.delete('session_by_token',
+            where = [ "\"token\" = %s" % t ]
+        )
