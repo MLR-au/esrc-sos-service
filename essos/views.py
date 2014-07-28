@@ -1,5 +1,6 @@
 from pyramid.view import view_config
 from pyramid.httpexceptions import (
+    HTTPOk,
     HTTPFound,
     HTTPInternalServerError,
     HTTPForbidden
@@ -73,7 +74,6 @@ def home(request):
 
 @view_config(route_name='login_staff', request_method="POST", renderer='json')
 def login_staff(request):
-    
     check = _check_user_known(request)
     if (not request.POST.get('username') and not request.POST.get('pasword')) and not check:
         raise HTTPFound('/')
@@ -168,8 +168,11 @@ def logout(request):
 @view_config(route_name="retrieve_token", request_method="GET", renderer='jsonp')
 def retrieve_token(request):
 
-    # ensure services on other domains can get to this method
-    request.response.headers['Access-Control-Allow-Origin'] = '*'
+    # only set the allow origin header if the referrer is one of our apps
+    if _validate_app_redirect(request, request.referrer):
+        request.response.headers['Access-Control-Allow-Origin'] = request.referrer
+    else:
+        return {}
 
     code = request.matchdict.get('code')
     session = CSession(request)
@@ -184,49 +187,69 @@ def retrieve_token(request):
         return { 'token': str(data[0].token) }
     return { 'token': None }
 
-@view_config(route_name="validate_token", request_method="POST", renderer='jsonp')
+@view_config(route_name="validate_token", request_method="OPTIONS")
+def validate_token_options(request):
+    print request.method
+    request.response.headers['Access-Control-Allow-Origin'] = request.referrer.rstrip('/')
+    request.response.headers['Access-Control-Allow-Methods'] = 'OPTIONS, POST'
+    request.response.headers['Access-Control-Allow-Headers'] = 'X-Requested-With, content-type'
+    raise HTTPOk(headers=request.response.headers)
+
+@view_config(route_name="validate_token", renderer='json')
 def validate_token(request):
+    print request.method
+    # only set the allow origin header if the referrer is one of our apps
+    if _validate_app_redirect(request, request.referrer):
+        request.response.headers['Access-Control-Allow-Origin'] = request.referrer.rstrip('/')
+        request.response.headers['Access-Control-Allow-Methods'] = 'OPTIONS, POST'
+        request.response.headers['Access-Control-Allow-Headers'] = 'X-Requested-With, content-type'
+    else:
+        return {}
 
-    # ensure services on other domains can get to this method
-    request.response.headers['Access-Control-Allow-Origin'] = '*'
-
-    token = request.matchdict.get('token')
+    token = request.json_body['data']['token']
     session = CSession(request)
     orm = ORM(session)
     data = orm.query('session_by_token',
         where = [ "\"token\" = %s" % token ]
     )
-    if data:
+    resp = Response(headers=request.response.headers)
+    if data:    
         data = data[0]
-        return { 'session': 'active', 'username': data.username, 'fullname': data.fullname, 'is_admin': data.is_admin }
-    return { 'session': 'expired', 'username': '', 'fullname': '', 'is_admin': False }
+        resp.json_body = { 'session': 'active', 'username': data.username, 'fullname': data.fullname, 'is_admin': data.is_admin}
+        return resp
+
+    resp.json_body = { 'session': 'expired', 'username': '', 'fullname': '', 'is_admin': False }
+    return resp
 
 def _move_the_user_on(request, r, data):
     # send the user on: either back to where they came
     #  from (if r is not None) or on to their profile page
+    request.response.set_cookie('EAT', str(data.token),
+        domain=request.registry.app_config['general']['cookie.domain'], path='/',
+        secure=ast.literal_eval(request.registry.app_config['general']['cookie.secure']), httponly=True)
     if r:
-        raise HTTPFound("%s?code=%s" % (r, data.code))
+        raise HTTPFound("%s?code=%s" % (r, data.code), headers=request.response.headers)
     else:
-        request.response.set_cookie('EAT', str(data.token),
-            domain=request.registry.app_config['general']['cookie.domain'], path='/',
-            secure=ast.literal_eval(request.registry.app_config['general']['cookie.secure']), httponly=True)
         if data.is_admin:
             raise HTTPFound("%s?code=%s" % (request.registry.app_config['general']['admin.app'], data.code), headers=request.response.headers)
         else:
             raise HTTPFound('/profile', headers=request.response.headers)
 
 def _validate_app_redirect(request, r):
-    app_configs = os.path.join(os.path.dirname(request.registry.settings['app.config']), request.registry.app_config['general']['apps'])
-    apps = {}
-    for f in os.listdir(app_configs):
-        c = AppsConfig(os.path.join(app_configs, f))
-        d = c.load()
-        apps[d.name] = d.url
- 
     authed_app = False
-    for k, v in apps.items():
-        if r.find(v) != -1:
-            authed_app = True
+    if request.registry.app_config['general']['admin.app'].find(r) == 0:
+        authed_app = True
+    else:
+        app_configs = os.path.join(os.path.dirname(request.registry.settings['app.config']), request.registry.app_config['general']['apps'])
+        apps = {}
+        for f in os.listdir(app_configs):
+            c = AppsConfig(os.path.join(app_configs, f))
+            d = c.load()
+            apps[d.name] = d.url
+     
+        for k, v in apps.items():
+            if v.find(r) != -1:
+                authed_app = True
 
     return authed_app
 
