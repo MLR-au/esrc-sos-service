@@ -37,8 +37,7 @@
         <hr/>
         <div class="row" style="border: 2px solid grey; border-radius: 8px; margin: 1px;">
             <div class="col-sm-6 col-md-6 col-lg-6">
-                <h4 class="text-center">Staff</h4>
-                <hr/>
+                <h4 class="text-center">Login</h4>
                 <form role="form" action="/login/staff" method="POST">
                     <input type="hidden" name="r" value="${r}" >
                     <div class="form-group">
@@ -50,11 +49,9 @@
                     <button class="btn btn-default btn-block">Login</button>
                 </form>
                 <hr/>
-                <p class="text-muted">Staff should login using their eSRC user account and password.</p>
-            </div>
-            <div class="col-sm-6 col-md-6 col-lg-6">
-                <h4 class="text-center">Collaborators</h4>
+                <h5 class="text-center">OR</h5>
                 <hr/>
+
                 <form role="form" action="/login/google" method="POST">
                     <input type="hidden" name="r" value="${r}" >
                     <button class="btn btn-default btn-block" type="submit">
@@ -68,14 +65,17 @@
                         <img src="/static/img/linkedin.png" style="height: 20px;"/>&nbsp;Login with your LinkedIn account
                     </button>
                 </form>
+                <br/>
+            </div>
+            <div class="col-sm-6 col-md-6 col-lg-6">
+                <h4 class="text-center">Help</h4>
+                <p class="text-muted">Staff should login using their eSRC user account and password.</p>
                 <hr/>
-                <p class="text-muted">Please login with one of the supported external authentication providers. Note
-                that this will not automatically grant you access if this is your first time here. 
+                <p class="text-muted">Collaborators who don't have an eSRC account should use one of the supported external 
+                authentication providers noting that this will not automatically grant access. After logging in for the first
+                time an eSRC staff member will authorise your account and grant you the privileges you require to access the
+                resources you've been authorised to use.
                 </p>
-                <p class="text-muted">If you require access to
-                one of our services an eSRC staff member will authorise your account and grant privileges as appropriate.
-                </p>
-                
             </div>
         </div>
         <hr/>
