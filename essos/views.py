@@ -3,7 +3,8 @@ from pyramid.httpexceptions import (
     HTTPOk,
     HTTPFound,
     HTTPInternalServerError,
-    HTTPForbidden
+    HTTPForbidden,
+    HTTPUnauthorized
 )
 from pyramid.response import Response
 import ast
@@ -165,9 +166,12 @@ def logout(request):
 
     return { 'session': 'closed' }
 
+@view_config(route_name="profile", request_method="GET", renderer='templates/profile.mak')
+def profile(request):
+    return {}
+
 @view_config(route_name="retrieve_token", request_method="GET", renderer='jsonp')
 def retrieve_token(request):
-
     # only set the allow origin header if the referrer is one of our apps
     if _validate_app_redirect(request, request.referrer):
         request.response.headers['Access-Control-Allow-Origin'] = request.referrer
@@ -185,11 +189,11 @@ def retrieve_token(request):
         #    where = [ "\"code\" = %s" % code ]
         #)
         return { 'token': str(data[0].token) }
-    return { 'token': None }
+
+    raise HTTPUnauthorized
 
 @view_config(route_name="validate_token", request_method="OPTIONS")
 def validate_token_options(request):
-    print request.method
     request.response.headers['Access-Control-Allow-Origin'] = request.referrer.rstrip('/')
     request.response.headers['Access-Control-Allow-Methods'] = 'OPTIONS, POST'
     request.response.headers['Access-Control-Allow-Headers'] = 'X-Requested-With, content-type'
@@ -197,7 +201,6 @@ def validate_token_options(request):
 
 @view_config(route_name="validate_token", renderer='json')
 def validate_token(request):
-    print request.method
     # only set the allow origin header if the referrer is one of our apps
     if _validate_app_redirect(request, request.referrer):
         request.response.headers['Access-Control-Allow-Origin'] = request.referrer.rstrip('/')
@@ -218,8 +221,7 @@ def validate_token(request):
         resp.json_body = { 'session': 'active', 'username': data.username, 'fullname': data.fullname, 'is_admin': data.is_admin}
         return resp
 
-    resp.json_body = { 'session': 'expired', 'username': '', 'fullname': '', 'is_admin': False }
-    return resp
+    raise HTTPUnauthorized
 
 def _move_the_user_on(request, r, data):
     # send the user on: either back to where they came
@@ -227,13 +229,13 @@ def _move_the_user_on(request, r, data):
     request.response.set_cookie('EAT', str(data.token),
         domain=request.registry.app_config['general']['cookie.domain'], path='/',
         secure=ast.literal_eval(request.registry.app_config['general']['cookie.secure']), httponly=True)
-    if r:
-        raise HTTPFound("%s?code=%s" % (r, data.code), headers=request.response.headers)
+
+    if data.is_admin:
+        raise HTTPFound("%s?s=%s" % (request.registry.app_config['general']['admin.app'], data.code), headers=request.response.headers)
+    elif r and request.registry.app_config['general']['admin.app'].find(r) != 0:
+        raise HTTPFound("%s?s=%s" % (r, data.code), headers=request.response.headers)
     else:
-        if data.is_admin:
-            raise HTTPFound("%s?code=%s" % (request.registry.app_config['general']['admin.app'], data.code), headers=request.response.headers)
-        else:
-            raise HTTPFound('/profile', headers=request.response.headers)
+        raise HTTPFound('/profile', headers=request.response.headers)
 
 def _validate_app_redirect(request, r):
     authed_app = False
