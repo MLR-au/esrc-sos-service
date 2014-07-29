@@ -36,6 +36,7 @@ def main(global_config, **settings):
 
     config.add_route('home', '/')
     config.add_route('logout', '/logout')
+    config.add_route('profile', '/profile')
     config.add_route('health_check', '/health-check')
     config.add_route('login_staff', '/login/staff')
     config.add_route("retrieve_token", "/code/{code}")
