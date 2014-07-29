@@ -12,7 +12,7 @@ class Models:
     def __init__(self, session):
         self.session = session
         self.create_session_tables()
-        #self.create_user_profile_table()
+        self.create_user_profile_table()
         self.create_health_check_table()
         #self.create_logging()
 
@@ -56,12 +56,20 @@ class Models:
 
     def create_user_profile_table(self):
         table_def = """
-        CREATE TABLE IF NOT EXISTS profile (
-            id              uuid PRIMARY KEY,
-            fullname        text, 
-            primary_email   text,
-            username        set<text>
+        CREATE TABLE IF NOT EXISTS profile_by_id (
+            "id"              uuid PRIMARY KEY,
+            "fullname"        text, 
+            "username"        text,
+            "email"           text
         );
+        """
+        self.create(table_def)
+        
+        table_def = """
+        CREATE TABLE IF NOT EXISTS profile_by_username (
+            "username"    text PRIMARY KEY,
+            "id"          uuid
+        )
         """
         self.create(table_def)
 
@@ -82,7 +90,8 @@ class Models:
         CREATE TABLE IF NOT EXISTS logging (
             id              uuid,
             timestamp       timestamp,
-            source          text,
+            application     text,
+            user            text,
             message         blob,
             PRIMARY KEY (id, timestamp)
         )
