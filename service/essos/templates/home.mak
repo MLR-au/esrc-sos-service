@@ -41,7 +41,7 @@
                 <form role="form" action="/login/staff" method="POST">
                     <input type="hidden" name="r" value="${r}" >
                     <div class="form-group">
-                        <input type="username" name="username" class="form-control" placeholder="Enter your eSRC username" required>
+                        <input type="username" name="username" class="form-control" placeholder="Enter your eSRC username" required autofocus>
                     </div>
                     <div class="form-group">
                         <input type="password" name="password" class="form-control" placeholder="Password" required>
@@ -69,12 +69,13 @@
             </div>
             <div class="col-sm-6 col-md-6 col-lg-6">
                 <h4 class="text-center">Help</h4>
-                <p class="text-muted">Staff should login using their eSRC user account and password.</p>
+                <p class="text-muted">Staff should login using their eSRC user account and password. Some collaborators will
+                also have a systems account and you should use this if you do.</p>
                 <hr/>
                 <p class="text-muted">Collaborators who don't have an eSRC account should use one of the supported external 
                 authentication providers noting that this will not automatically grant access. After logging in for the first
-                time an eSRC staff member will authorise your account and grant you the privileges you require to access the
-                resources you've been authorised to use.
+                time an eSRC staff member will authorise your account and grant you access to the
+                resources you require.
                 </p>
             </div>
         </div>
