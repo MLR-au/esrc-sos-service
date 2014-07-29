@@ -58,16 +58,25 @@ class Models:
         table_def = """
         CREATE TABLE IF NOT EXISTS profile_by_id (
             "id"              uuid PRIMARY KEY,
-            "fullname"        text, 
             "username"        text,
-            "email"           text
+            "fullname"        text, 
+            "primary_email"   text,
+            "alt_emails"      text
         );
         """
         self.create(table_def)
         
         table_def = """
-        CREATE TABLE IF NOT EXISTS profile_by_username (
+        CREATE TABLE IF NOT EXISTS profile_by_name (
             "username"    text PRIMARY KEY,
+            "id"          uuid
+        )
+        """
+        self.create(table_def)
+
+        table_def = """
+        CREATE TABLE IF NOT EXISTS profile_by_email (
+            "email"       text PRIMARY KEY,
             "id"          uuid
         )
         """
