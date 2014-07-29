@@ -163,8 +163,7 @@ def logout(request):
             where = [ "\"token\" = %s" % check.token ])
         orm.delete('session_by_name',
             where = [ "\"username\" = '%s'" % check.username ])
-
-    return { 'session': 'closed' }
+    raise HTTPUnauthorized
 
 @view_config(route_name="profile", request_method="GET", renderer='templates/profile.mak')
 def profile(request):
@@ -232,28 +231,36 @@ def _move_the_user_on(request, r, data):
 
     if data.is_admin:
         raise HTTPFound("%s?s=%s" % (request.registry.app_config['general']['admin.app'], data.code), headers=request.response.headers)
-    elif r and request.registry.app_config['general']['admin.app'].find(r) != 0:
+    elif r and not _compare(urlparse(request.registry.app_config['general']['admin.app']), urlparse(r)):
         raise HTTPFound("%s?s=%s" % (r, data.code), headers=request.response.headers)
     else:
         raise HTTPFound('/profile', headers=request.response.headers)
 
 def _validate_app_redirect(request, r):
     authed_app = False
-    if request.registry.app_config['general']['admin.app'].find(r) == 0:
-        authed_app = True
-    else:
-        app_configs = os.path.join(os.path.dirname(request.registry.settings['app.config']), request.registry.app_config['general']['apps'])
-        apps = {}
-        for f in os.listdir(app_configs):
-            c = AppsConfig(os.path.join(app_configs, f))
-            d = c.load()
-            apps[d.name] = d.url
-     
-        for k, v in apps.items():
-            if v.find(r) != -1:
-                authed_app = True
+    if r is not None:
+        if _compare(urlparse(r), urlparse(request.registry.app_config['general']['admin.app'])):
+            authed_app = True
+        else:
+            app_configs = os.path.join(os.path.dirname(request.registry.settings['app.config']), request.registry.app_config['general']['apps'])
+            apps = {}
+            for f in os.listdir(app_configs):
+                c = AppsConfig(os.path.join(app_configs, f))
+                d = c.load()
+                apps[d.name] = d.url
+         
+            for k, v in apps.items():
+                if _compare(urlparse(r), urlparse(v)):
+                    authed_app = True
 
     return authed_app
+
+def _compare(a, b):
+    # expects a urlparse tuple; will compare scheme and netloc
+    if a.scheme == b.scheme and a.netloc == b.netloc:
+        return True
+    else:
+        return False
 
 def _check_user_known(request):
     # is there a token in the request?
