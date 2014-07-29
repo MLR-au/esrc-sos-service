@@ -6,7 +6,8 @@ from pyramid import testing
 from views import logout
 from pyramid.httpexceptions import (
     HTTPFound,
-    HTTPForbidden
+    HTTPForbidden,
+    HTTPUnauthorized
 )
 
 import sys
@@ -27,7 +28,7 @@ class HomeViewTests(unittest.TestCase):
         testing.tearDown()
 
     def test_logout(self):
-        with self.assertRaises(HTTPFound):
+        with self.assertRaises(HTTPUnauthorized):
             l = logout(self.request)
 
         
