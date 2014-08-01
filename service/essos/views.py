@@ -18,10 +18,11 @@ from datetime import datetime, timedelta, date
 from urlparse import urlparse
 
 import logging
-log = logging.getLogger()
+log = logging.getLogger('essos')
 
 from models import CSession, ORM
 from config import AppsConfig
+from common import *
 
 @view_config(route_name="health_check", request_method="GET", renderer="string")
 def health_check(request):
@@ -48,21 +49,14 @@ def health_check(request):
 
 @view_config(route_name='home', request_method="GET", renderer='templates/home.mak')
 def home(request):
-    r = ''
-    if request.GET.has_key('r'):
-        r = request.GET['r']
-        if r != request.registry.app_config['general']['admin.app']:
-            if not _validate_app_redirect(request, r):
-                raise HTTPFound('/')
+    # get the URL params; these will be blank if unset
+    r = request.GET.get('r')
+    e = request.GET.get('e')
 
-    e = False
-    if request.GET.has_key('e'):
-        e = True
-
-    check = _check_user_known(request)
+    check = check_user_known(request)
     if check:
         # send the user on
-        _move_the_user_on(request, r, check)
+        move_the_user_on(request, r, check)
 
     try:
         # if REMOTE_ADDR is not set in the environment then we have to wonder what the
@@ -75,7 +69,7 @@ def home(request):
 
 @view_config(route_name='login_staff', request_method="POST", renderer='json')
 def login_staff(request):
-    check = _check_user_known(request)
+    check = check_user_known(request)
     if (not request.POST.get('username') and not request.POST.get('pasword')) and not check:
         raise HTTPFound('/')
 
@@ -84,11 +78,8 @@ def login_staff(request):
     result = ldap.authenticate(request.POST['username'], request.POST['password'])
 
     r = request.POST.get('r')
-    if r != '':
-        if not _validate_app_redirect(request, r):
-            raise HTTPFound('/')
 
-    # if not result means they didn't auth successfully so send
+    # if 'not result' means they didn't auth successfully so send
     #  them back to the start (to try again) with a marker (e=True)
     #  to flag that something is wrong.
     if not result and r:
@@ -149,12 +140,12 @@ def login_staff(request):
         )
 
     # send the user on
-    _move_the_user_on(request, r, data[0])
+    move_the_user_on(request, r, data[0])
 
 @view_config(route_name="logout", request_method="GET", renderer='jsonp')
 def logout(request):
     log.debug('logout called')
-    check = _check_user_known(request)
+    check = check_user_known(request)
     if check:
         # ditch the server side token
         session = CSession(request)
@@ -172,7 +163,7 @@ def profile(request):
 @view_config(route_name="retrieve_token", request_method="GET", renderer='jsonp')
 def retrieve_token(request):
     # only set the allow origin header if the referrer is one of our apps
-    if _validate_app_redirect(request, request.referrer):
+    if validate_app_redirect(request, request.referrer):
         request.response.headers['Access-Control-Allow-Origin'] = request.referrer
     else:
         return {}
@@ -191,23 +182,8 @@ def retrieve_token(request):
 
     raise HTTPUnauthorized
 
-@view_config(route_name="validate_token", request_method="OPTIONS")
-def validate_token_options(request):
-    request.response.headers['Access-Control-Allow-Origin'] = request.referrer.rstrip('/')
-    request.response.headers['Access-Control-Allow-Methods'] = 'OPTIONS, POST'
-    request.response.headers['Access-Control-Allow-Headers'] = 'X-Requested-With, content-type'
-    raise HTTPOk(headers=request.response.headers)
-
-@view_config(route_name="validate_token", renderer='json')
+@view_config(route_name="validate_token", request_method="POST", renderer='json')
 def validate_token(request):
-    # only set the allow origin header if the referrer is one of our apps
-    if _validate_app_redirect(request, request.referrer):
-        request.response.headers['Access-Control-Allow-Origin'] = request.referrer.rstrip('/')
-        request.response.headers['Access-Control-Allow-Methods'] = 'OPTIONS, POST'
-        request.response.headers['Access-Control-Allow-Headers'] = 'X-Requested-With, content-type'
-    else:
-        return {}
-
     token = request.json_body['data']['token']
     session = CSession(request)
     orm = ORM(session)
@@ -222,61 +198,3 @@ def validate_token(request):
 
     raise HTTPUnauthorized
 
-def _move_the_user_on(request, r, data):
-    # send the user on: either back to where they came
-    #  from (if r is not None) or on to their profile page
-    request.response.set_cookie('EAT', str(data.token),
-        domain=request.registry.app_config['general']['cookie.domain'], path='/',
-        secure=ast.literal_eval(request.registry.app_config['general']['cookie.secure']), httponly=True)
-
-    if data.is_admin:
-        raise HTTPFound("%s?s=%s" % (request.registry.app_config['general']['admin.app'], data.code), headers=request.response.headers)
-    elif r and not _compare(urlparse(request.registry.app_config['general']['admin.app']), urlparse(r)):
-        raise HTTPFound("%s?s=%s" % (r, data.code), headers=request.response.headers)
-    else:
-        raise HTTPFound('/profile', headers=request.response.headers)
-
-def _validate_app_redirect(request, r):
-    authed_app = False
-    if r is not None:
-        if _compare(urlparse(r), urlparse(request.registry.app_config['general']['admin.app'])):
-            authed_app = True
-        else:
-            app_configs = os.path.join(os.path.dirname(request.registry.settings['app.config']), request.registry.app_config['general']['apps'])
-            apps = {}
-            for f in os.listdir(app_configs):
-                c = AppsConfig(os.path.join(app_configs, f))
-                d = c.load()
-                apps[d.name] = d.url
-         
-            for k, v in apps.items():
-                if _compare(urlparse(r), urlparse(v)):
-                    authed_app = True
-
-    return authed_app
-
-def _compare(a, b):
-    # expects a urlparse tuple; will compare scheme and netloc
-    if a.scheme == b.scheme and a.netloc == b.netloc:
-        return True
-    else:
-        return False
-
-def _check_user_known(request):
-    # is there a token in the request?
-    token = request.cookies.get('EAT')
-    if token is None:
-        return False
-
-    # is the token still valid?
-    session = CSession(request)
-    orm = ORM(session)
-    data = orm.query('session_by_token',
-        where = [ "\"token\" = %s" % token ]
-    )
-    if not data:
-        return False
-
-    # if we get to here then the user is known
-    #   so we return the data we have about them.
-    return data[0]
