@@ -41,6 +41,7 @@ def main(global_config, **settings):
     config.add_route('login_staff', '/login/staff')
     config.add_route("retrieve_token", "/code/{code}")
     config.add_route('validate_token', '/token')
+    config.add_route('get_users', '/users')
 
     config.add_route('login_google', '/login/google')
     config.add_route('login_linkedin', '/login/linkedin')
