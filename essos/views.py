@@ -14,20 +14,24 @@ import time
 import uuid
 import os
 import os.path
+import sys
 from datetime import datetime, timedelta, date
-from urlparse import urlparse
 
 import logging
 log = logging.getLogger('essos')
 
-from models import CSession, ORM
+from pymongo.errors import (
+    OperationFailure
+)
+import pymongo
+import velruse
+
+from connectors import MongoDBConnection as mdb
 from config import AppsConfig
 from common import *
 
 @view_config(route_name="health_check", request_method="GET", renderer="string")
 def health_check(request):
-    t1 = time.time()
-
     # can we connect to an LDAP server
     lc = request.registry.app_config['ldap']
     ldap = auth.LDAP(lc['servers'], lc['base'], lc['binduser'], lc['bindpass'])
@@ -35,28 +39,40 @@ def health_check(request):
         raise HTTPInternalServerError
 
     # do we have a working connection to cassandra
-    session = CSession(request)
+    db = mdb(request)
 
     # add a trace into the health_check table
-    orm = ORM(session)
-    t2 = time.time() - t1
-    orm.insert('health_check',
-        [ 'date', 'timestamp', 'request_time'], 
-        [ str(date.today()), datetime.utcnow(), t2 ]
-    )
+    try:
+        doc = db.health_check.find_one({ 'name': 'hc' })
+        db.health_check.remove(doc['_id'])
+    except:
+        pass
+    db.health_check.insert({ 'name': 'hc' })
 
+    log.debug('Mongo cluster seems to be in working order.')
     return 'OK'
 
 @view_config(route_name='home', request_method="GET", renderer='templates/home.mak')
 def home(request):
+    """ """
+    # get the url params
+    #  validate the r param if exists and redirect to bare home domain if it's not a 
+    #  verified application - ie one of ours
+    # check that the user is known and just take them straight to their profile
+    #  page if they are
+
     # get the URL params; these will be blank if unset
     r = request.GET.get('r')
     e = request.GET.get('e')
 
-    check = check_user_known(request)
-    if check:
+    # is the redirecting app authorised? if not - redirect to home
+    if r and not validate_app_redirect(request, r):
+        raise HTTPFound('/')
+
+    user = check_user_known(request)
+    if user:
         # send the user on
-        move_the_user_on(request, r, check)
+        move_the_user_on(request, r, user['token'])
 
     try:
         # if REMOTE_ADDR is not set in the environment then we have to wonder what the
@@ -69,8 +85,8 @@ def home(request):
 
 @view_config(route_name='login_staff', request_method="POST", renderer='json')
 def login_staff(request):
-    check = check_user_known(request)
-    if (not request.POST.get('username') and not request.POST.get('pasword')) and not check:
+    user = check_user_known(request)
+    if (not request.POST.get('username') and not request.POST.get('pasword')) and not user:
         raise HTTPFound('/')
 
     lc = request.registry.app_config['ldap']
@@ -82,83 +98,78 @@ def login_staff(request):
     # if 'not result' means they didn't auth successfully so send
     #  them back to the start (to try again) with a marker (e=True)
     #  to flag that something is wrong.
-    if not result and r:
-        raise HTTPFound("/?r=%s&e=True")
-    elif not result:
-        raise HTTPFound('/?e=True')
+    if not result:
+        lockout_ip(request)
+        if r:
+            raise HTTPFound("/?r=%s&e=True" % r)
+        else:
+            raise HTTPFound('/?e=True')
+
+    # grab the user data
+    data = ldap.get_user_data()
 
     # if we get to here then the user has auth'ed successfully
-    session = CSession(request)
+    db = mdb(request)
 
-    # get their data, determine if they're an admin
-    user_data = ldap.get_user_data()
-    is_admin = False
-    for g in request.registry.app_config['general']['admins']:
-        if g in user_data[2]:
-            is_admin = True
-
-    # if they already have a session, re use that token
-    orm = ORM(session)
-    data = orm.query('session_by_name',
-        where = [ "\"username\" = '%s'" % user_data.username ]
-    )
-    if data:
-        # there's already a session going - use that token
-        data = orm.query('session_by_token',
-            where = [ "\"token\" = %s" % data[0].token]
-        )
+    # do they have a session?
+    doc = db.session.find_one({ 'username': data.username })
+    if doc is not None:
+        move_the_user_on(request, r, doc['token'])
 
     else:
-        # no current session so create a token for them
+        # ensure we have the required indexes on username and token
+        db.session.ensure_index('username', pymongo.ASCENDING)
+        db.session.ensure_index('token', pymongo.ASCENDING)
+
+        # no session found for the current user so we need to create one
         session_lifetime = int(request.registry.app_config['general']['session.lifetime'])
-        expire = datetime.utcnow() + timedelta(session_lifetime)
         token = uuid.uuid4()
-        code = uuid.uuid4()
+        db.session.insert({
+            'username': data.username,
+            'fullname': data.fullname,
+            'token': token,
+            'groups': data.groups,
+            'createdAt': datetime.utcnow()
+        })
+        try:
+            db.session.ensure_index('createdAt', expireAfterSeconds = session_lifetime)
+        except OperationFailure:
+            db.session.drop_index('createdAt_1')
+            db.session.ensure_index('createdAt', expireAfterSeconds = session_lifetime)
 
-        orm.insert('session_by_token',
-            fields = [ 'token', 'code', 'expire', 'username', 'fullname', 'is_admin', ], 
-            data = [ token, code, expire, user_data[0], user_data[1], is_admin ],
-            ttl = session_lifetime
-        )
+    move_the_user_on(request, r, token)
 
-        orm.insert('session_by_name',
-            fields = [ 'token', 'username' ],
-            data = [ token, user_data[0] ],
-            ttl = session_lifetime
-        )
-
-        orm.insert('session_by_code',
-            fields = [ 'code', 'token' ],
-            data = [ code, token ],
-            ttl = session_lifetime
-        )
-
-        # we get the data back from cassandra and use that - think
-        #  of it as sort of health check
-        data = orm.query('session_by_token',
-            where = [ "\"token\" = %s" % token]
-        )
-
-    # send the user on
-    move_the_user_on(request, r, data[0])
+    return {}
 
 @view_config(route_name="logout", request_method="GET", renderer='jsonp')
 def logout(request):
     log.debug('logout called')
-    check = check_user_known(request)
-    if check:
-        # ditch the server side token
-        session = CSession(request)
-        orm = ORM(session)
-        orm.delete('session_by_token',
-            where = [ "\"token\" = %s" % check.token ])
-        orm.delete('session_by_name',
-            where = [ "\"username\" = '%s'" % check.username ])
-    raise HTTPUnauthorized
+    db = mdb(request)
+    token = request.cookies.get('EAT')
+    db.session.remove(token=token)
+
+    delete_cookie(request)
+    raise HTTPFound('/', headers=request.response.headers)
 
 @view_config(route_name="profile", request_method="GET", renderer='templates/profile.mak')
 def profile(request):
-    return {}
+    log.debug("%s: profile view" % request.client_addr)
+    # grab the users token and verify
+    # redirect to login page if no token or invalid
+    # display app list otherwise
+    user = check_user_known(request)
+    if not user:
+        raise HTTPFound('/')
+
+    # generate the app data list and return that to the profile page
+    apps = get_app_data(request)
+    allowed_apps = []
+    for app in apps:
+        s1 = set(app.allow)
+        s2 = set(user['groups'])
+        if s1.intersection(s2):
+            allowed_apps.append(app)
+    return  { 'apps': allowed_apps, 'fullname': user['fullname'] }
 
 @view_config(route_name="retrieve_token", request_method="GET", renderer='jsonp')
 def retrieve_token(request):
@@ -198,3 +209,33 @@ def validate_token(request):
 
     raise HTTPUnauthorized
 
+@view_config(context='velruse.providers.google_oauth2.GoogleAuthenticationComplete')
+def google_login_complete(request):
+    session = request.session
+    context = request.context
+    for k, v in context.profile.items():
+        print k, v
+
+    #session['isLoggedIn'] = True
+    #session['username'] = context.profile['displayName']
+    #session['email'] = context.profile['verifiedEmail']
+    raise HTTPFound('/')
+
+@view_config(context='velruse.providers.linkedin.LinkedInAuthenticationComplete')
+def linkedin_login_complete(request):
+    session = request.session
+    context = request.context
+    for k, v in context.profile.items():
+        print k, v
+
+    #session['isLoggedIn'] = True
+    #session['username'] = context.profile['name']['formatted']
+    #session['email'] = context.profile['emails'][0]['value']
+    #session['email'] = context.profile['verifiedEmail']
+    #print context.profile
+    raise HTTPFound('/')
+
+
+@view_config(context='velruse.AuthenticationDenied', renderer="denied.mak")
+def login_denied_view(request):
+    raise HTTPFound('/')
