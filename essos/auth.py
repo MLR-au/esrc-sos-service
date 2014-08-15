@@ -93,6 +93,7 @@ class LDAP:
         return user_data(self.data['uid'][0], self.data['cn'][0], self.groups)
 
     def get_user_groups(self, username):
+        """Return the groups this user is a member of"""
         self.conn.simple_bind_s(self.binduser, self.bindpass)
         data = []
         try:
