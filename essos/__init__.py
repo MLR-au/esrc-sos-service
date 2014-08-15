@@ -4,17 +4,15 @@ from pyramid.renderers import JSONP
 
 from config import Config as appConfig
 
-from connectors import CassandraBackend
+from connectors import MongoBackend
+import auth_providers
 
-def init_cassandra_connection(conf):
-    arguments = {
-        'nodes': conf['nodes'],
-        'user': conf['user'],
-        'pass': conf['pass'],
-        'keyspace': conf['keyspace']
-    }
-    c = CassandraBackend(arguments)
-    return c.session
+from pyramid.session import SignedCookieSessionFactory
+
+def init_mongodb_connection(conf):
+    m = MongoBackend()
+    m.connect(conf)
+    return m.client
  
 
 def main(global_config, **settings):
@@ -23,11 +21,19 @@ def main(global_config, **settings):
     config = Configurator(settings=settings)
     setup_logging(global_config['__file__'])
 
-    # initialise a connection to cassandra on startup and store the region
+    # initialise a connection to mongo on startup and store the client 
     #  in the registry which will be injected into each request
     conf = appConfig(config.registry.settings.get('app.config'))
     config.registry.app_config = conf.app_config
-    config.registry.app_config['cassandra']['session'] = init_cassandra_connection(config.registry.app_config['cassandra'])
+    config.registry.app_config['mongodb']['client'] = init_mongodb_connection(config.registry.app_config['mongodb'])
+
+    # a session factory is required by velruse but we'll grab the password from the
+    #  datafile that has all the other secret stuff we don't want in git
+    session_factory = SignedCookieSessionFactory(auth_providers.session_secret)
+    config.set_session_factory(session_factory)
+
+    # pull in the login provider information
+    auth_providers.add_providers(config)
 
     config.include('pyramid_mako')
     config.add_static_view('static', 'static', cache_max_age=3600)
