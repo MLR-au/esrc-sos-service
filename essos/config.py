@@ -51,7 +51,8 @@ class Config(ConfigBase):
                 'apps': self.get('General', 'apps'),
                 'session.lifetime': self.get('General', 'session.lifetime'),
                 'cookie.domain': self.get('General', 'cookie.domain'),
-                'cookie.secure': self.get('General', 'cookie.secure')
+                'cookie.secure': self.get('General', 'cookie.secure'),
+                'lockout.time': self.get('General', 'lockout.time')
             },
             'ldap': {
                 'servers': self.get('LDAP', 'ldap.servers', aslist=True),
@@ -59,11 +60,13 @@ class Config(ConfigBase):
                 'binduser': self.get('LDAP', 'bind.user'),
                 'bindpass': self.get('LDAP', 'bind.pass')
             },
-            'cassandra': {
-                'user': self.get('CASSANDRA', 'user'),
-                'pass': self.get('CASSANDRA', 'pass'),
-                'nodes': self.get('CASSANDRA', 'nodes', aslist=True),
-                'keyspace': self.get('CASSANDRA', 'keyspace')
+            'mongodb': {
+                'nodes': self.get('MONGODB', 'nodes', aslist=True),
+                'user': self.get('MONGODB', 'user'),
+                'pass': self.get('MONGODB', 'pass'),
+                'db': self.get('MONGODB', 'db'),
+                'replica_set': self.get('MONGODB', 'replica.set'),
+                'write_concern': self.get('MONGODB', 'write.concern')
             }
         }
 
@@ -78,8 +81,12 @@ class AppsConfig(ConfigBase):
             sys.exit()
 
     def load(self):
-        conf = collections.namedtuple('appsconf', [ 'name', 'url' ])
-        return conf(self.get('General', 'name'), self.get('General', 'url'))
+        conf = collections.namedtuple('appsconf', [ 'name', 'url', 'description', 'allow' ])
+        return conf(self.get('General', 'name'), 
+                    self.get('General', 'url'), 
+                    self.get('General', 'description'),
+                    self.get('General', 'allow', aslist=True)
+                    )
 
 
 
