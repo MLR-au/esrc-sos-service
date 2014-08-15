@@ -4,8 +4,15 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="pyramid web application">
-    <meta name="author" content="Pylons Project">
+    <meta name="description" content="eScholarship Research Centre Single Sign on Service"
+    <meta name="author" content="Dr Marco La Rosa <m@lr.id.au>">
+
+    <meta http-equiv="cache-control" content="max-age=0" />
+    <meta http-equiv="cache-control" content="no-cache" />
+    <meta http-equiv="expires" content="0" />
+    <meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT" />
+    <meta http-equiv="pragma" content="no-cache" />
+
     <link rel="shortcut icon" href="${request.static_url('essos:static/pyramid-16x16.png')}">
 
     <title>eSRC Single Sign on Service (ESSOS)</title>
