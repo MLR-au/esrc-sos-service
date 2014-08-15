@@ -1,22 +1,25 @@
-from cassandra import auth, policies
-from cassandra.cluster import Cluster
-
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
+from pyramid.httpexceptions import HTTPInternalServerError
 import time
+import logging
+log = logging.getLogger('essos')
 
-from models import Models
+def MongoDBConnection(request):
+    client = request.registry.app_config['mongodb']['client']
+    db = request.registry.app_config['mongodb']['db']
+    return client[db]
 
-class CassandraBackend:
-    def __init__(self, arguments):
-        self.nodes = arguments['nodes']
-        self.user = arguments['user']
-        self.passwd = arguments['pass']
-        self.keyspace = arguments['keyspace']
+class MongoBackend:
+    def __init__(self):
+        pass
 
-        auth_provider = auth.PlainTextAuthProvider(username=self.user, password=self.passwd)
-        cluster = Cluster(self.nodes, auth_provider=auth_provider, executor_threads=len(self.nodes))
-        cluster.set_core_connections_per_host(policies.HostDistance.LOCAL, 1)
-        self.session = cluster.connect()
-        self.session.set_keyspace(self.keyspace)
-
-        # load the models - it's up to the model to handle exceptions gracefully
-        m = Models(self.session)
+    def connect(self, conf):
+        # set up the mongo connection
+        try:
+            self.client = MongoClient(conf['nodes'], replicaset=conf['replica_set'], w=conf['write_concern'])
+            self.client.admin.authenticate(conf['user'], conf['pass'])
+            log.debug("Connection to Mongo cluster instantiated.")
+        except ConnectionFailure:
+            log.error("Can't connect to MongoDB at this time. Check the cluster.")
+            raise HTTPInternalServerError
