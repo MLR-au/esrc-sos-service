@@ -13,7 +13,6 @@ import os
 import os.path
 
 from config import Config
-from connectors import CassandraBackend
 
 import os
 here = os.path.dirname(__file__)
@@ -25,16 +24,7 @@ class HealthCheckViewTests(unittest.TestCase):
         self.request = testing.DummyRequest()
         conf = Config(settings['app.config'])
 
-        self.arguments = {
-            'nodes': conf.app_config['cassandra']['nodes'],
-            'user': conf.app_config['cassandra']['user'],
-            'pass': conf.app_config['cassandra']['pass'],
-            'keyspace': conf.app_config['cassandra']['keyspace']
-        }
-        c = CassandraBackend(self.arguments)
-
         self.request.registry.app_config = conf.app_config
-        self.request.registry.app_config['cassandra']['session'] = c.session
 
     def tearDown(self):
         testing.tearDown()

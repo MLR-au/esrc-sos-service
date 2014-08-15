@@ -7,8 +7,6 @@ import os
 import os.path
 
 from config import Config, AppsConfig
-from connectors import CassandraBackend
-import cassandra
 from models import *
 import time
 from datetime import datetime, date
@@ -30,7 +28,6 @@ class ConfigTests(unittest.TestCase):
     def test_config(self):
         self.assertTrue(self.conf.has_key('general'))
         self.assertTrue(self.conf.has_key('ldap'))
-        self.assertTrue(self.conf.has_key('cassandra'))
 
     def test_app_configs(self):
         app_configs = os.path.join(os.path.dirname(settings['app.config']), self.conf['general']['apps'])
