@@ -17,6 +17,8 @@ class ConfigBase:
 
     def get(self, section, param, aslist=False):
         data = self.cfg.get(section, param) if (self.cfg.has_section(section) and self.cfg.has_option(section, param)) else None
+        if data == None:
+            log.error("Missing parameter %s in section %s" % (param, section))
         if aslist:
             return [ d.strip() for d in data.split(',') ]
         return data
@@ -48,10 +50,8 @@ class Config(ConfigBase):
             'general': {
                 'admins': self.get('General', 'admins', aslist=True),
                 'admin.app': self.get('General', 'admin.app'),
-                'apps': self.get('General', 'apps'),
                 'session.lifetime': self.get('General', 'session.lifetime'),
-                'cookie.domain': self.get('General', 'cookie.domain'),
-                'cookie.secure': self.get('General', 'cookie.secure'),
+                'apps': self.get('General', 'apps'),
                 'lockout.time': self.get('General', 'lockout.time')
             },
             'ldap': {
@@ -81,11 +81,12 @@ class AppsConfig(ConfigBase):
             sys.exit()
 
     def load(self):
-        conf = collections.namedtuple('appsconf', [ 'name', 'url', 'description', 'allow' ])
+        conf = collections.namedtuple('appsconf', [ 'name', 'url', 'description', 'login_callback' ])
         return conf(self.get('General', 'name'), 
                     self.get('General', 'url'), 
                     self.get('General', 'description'),
-                    self.get('General', 'allow', aslist=True)
+                    self.get('General', 'login_callback'),
+                    self.get('General', 'forbidden_callback')
                     )
 
 
