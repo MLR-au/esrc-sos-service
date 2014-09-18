@@ -1,3 +1,7 @@
 [General]
-name:           Pretty name for the app
-url:            The URL of the app. This should be https. Period.
+name:               Application nice name
+url:                URL to the app
+description:        A brief description of the app functionality
+login_callback:     If user auth's successfully and is allowed to access app - the URL callback to load
+forbidden_callback: If user auth's successfully but isn't allowed to access app - the forbidden URL callback to load
+allow:              Comma separated list of groups allowed to access the app
