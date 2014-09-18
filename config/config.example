@@ -5,9 +5,6 @@
 ##   into a python list
 admins:             admins-group1, admin-group2
 
-## Admin app. The url to the admin console.
-admin.app:          https://admin.example.com
-
 ## This is the lifetime of the session in seconds
 session.lifetime:   300
  
@@ -17,13 +14,10 @@ session.lifetime:   300
 ##  configurations.
 apps:               apps
 
-## Cookie configuration. Set the domain to the domain of this service and ensure
-##  the admin app is on the same domain.
-##
-# Unless developing (when you're probably using http) cookie.secure should be set
-##  to True
-cookie.domain:      example.com
-cookie.secure:      True
+## IP address lockout time
+### Slow the hackers down by this amount of time - don't bother checking or even
+###  responding. This is time in seconds.
+lockout.time:       300
 
 [LDAP]
 ## LDAP Configuration
@@ -40,19 +34,15 @@ search.base:    o=mygroup,dc=example,dc=com
 bind.user:      cn=user,ou=people,o=mygroup,dc=example,dc=com
 bind.pass:      supersekrit
 
-[CASSANDRA]
-## CASSANDRA Configuration
-##  nodes: At least a couple of the cassandra nodes in the cluster. The client
-##   retrieves the topology of the cluster from any node which it can connect to
+[MONGODB]
+##  nodes: At least a couple of mongo nodes in the cluster. The client
+##   retrieves the structure of the replica set from any node which it can connect to
 ##   so having at least a couple of nodes in the list will guard against node failure.
 ## This is a comma separated list and it will be turned into a python list by the app
-nodes:      IP.host1, IP.host2, IP.host3
-
-## The user, password and keyspace to use
-user:       username
-pass:       password
-keyspace:   keyspace_name
-
-
-
-
+##   and they will be tried in turn.
+nodes:          IP.host1, IP.host2, IP.host3
+user:           username
+pass:           password
+db:             database_name
+replica.set:    prod01
+write.concern:  3
