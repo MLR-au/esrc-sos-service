@@ -41,15 +41,13 @@ def main(global_config, **settings):
     config.add_renderer('jsonp', JSONP(param_name='callback'))
 
     config.add_route('home', '/')
-    config.add_route('logout', '/logout')
-    config.add_route('profile', '/profile')
     config.add_route('health_check', '/health-check')
-    config.add_route('login_staff', '/login/staff')
-    config.add_route("retrieve_token", "/code/{code}")
-    config.add_route('validate_token', '/token')
-    config.add_route('get_users', '/users')
 
+    config.add_route('login_staff', '/login/staff')
     config.add_route('login_google', '/login/google')
     config.add_route('login_linkedin', '/login/linkedin')
+
+    config.add_route('retrieve_token', '/token/{code}')
+    config.add_route('validate_token', '/token')
     config.scan()
     return config.make_wsgi_app()
