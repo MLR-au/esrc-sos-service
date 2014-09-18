@@ -43,6 +43,18 @@ def get_login_callback(request, r):
         if compare(r, app.url):
             return app.login_callback
 
+def get_forbidden_callback(request, r):
+    apps = get_app_data(request)
+    for app in apps:
+        if compare(r, app.url):
+            return app.forbidden_callback
+
+def get_app_allow(request, r):
+    apps = get_app_data(request)
+    for app in apps:
+        if compare(r, app.url):
+            return app.allow
+
 def compare(a, b):
     # expects a couple of urls - urlparse will be used to 
     #  split the components for comparison

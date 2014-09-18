@@ -102,8 +102,8 @@ def login_staff(request):
 
     # if we get to here then the user has auth'ed successfully
     # grab the user data
-    data = ldap.get_user_data()
-    log.debug(data)
+    user_data = ldap.get_user_data()
+    log.debug(user_data)
 
     # grab a handle to the database
     db = mdb(request)
@@ -115,7 +115,7 @@ def login_staff(request):
     db.code.ensure_index('code', pymongo.ASCENDING)
 
     # is there already a session? if so - generate a code for that and return it
-    doc = db.session.find_one({ 'username': data.username })
+    doc = db.session.find_one({ 'username': user_data.username })
     try:
         # there's an existing session - generate a code for it and return that
         log.debug('Found existing session')
@@ -126,11 +126,17 @@ def login_staff(request):
         # create a session for the user 
         session_lifetime = int(request.registry.app_config['general']['session.lifetime'])
         token = str(uuid.uuid4()).replace('-', '')
+
+        # check to confirm that there isn't already a session with this id in the db
+        doc = db.session.find_one({ 'token': token })
+        if doc is not None:
+            token = str(uuid.uuid4()).replace('-', '')
+
         db.session.insert({
-            'username': data.username,
-            'fullname': data.fullname,
+            'username': user_data.username,
+            'fullname': user_data.fullname,
             'token': token,
-            'groups': data.groups,
+            'groups': user_data.groups,
             'createdAt': datetime.utcnow(),
             'expiresAt': datetime.utcnow() + timedelta(seconds = session_lifetime)
         })
@@ -158,11 +164,23 @@ def login_staff(request):
             db.code.drop_index('createdAt_1')
             db.code.ensure_index('createdAt', expireAfterSeconds = 5)
 
-    log.debug('Returning one time code to the calling application')
-    login_callback = get_login_callback(request, r)
-    log.debug("Callback: %s/%s, Token: %s, One time code: %s" % (login_callback, otc, token, otc))
 
-    raise HTTPFound("%s/%s" % (login_callback, otc))
+    # is the user actually allowed to access this app?
+    allowed = False
+    app_groups_allowed = get_app_allow(request, r)
+    for g in user_data.groups:
+        if g in app_groups_allowed:
+            allowed = True
+
+    if allowed:
+        login_callback = get_login_callback(request, r)
+        log.debug('Returning one time code to the calling application')
+        log.debug("Callback: %s/%s, Token: %s, One time code: %s" % (login_callback, otc, token, otc))
+        raise HTTPFound("%s/%s" % (login_callback, otc))
+    else:
+        log.debug('User not allowed to use this application')
+        forbidden_callback = get_forbidden_callback(request, r)
+        raise HTTPFound("%s" % (forbidden_callback))
 
 @view_config(context='velruse.providers.google_oauth2.GoogleAuthenticationComplete')
 def google_login_complete(request):
