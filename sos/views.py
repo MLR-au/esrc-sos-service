@@ -17,7 +17,7 @@ import sys
 from datetime import datetime, timedelta, date
 
 import logging
-log = logging.getLogger('essos')
+log = logging.getLogger(__name__)
 
 import velruse
 
@@ -207,6 +207,10 @@ def linkedin_login_complete(request):
     #session['email'] = context.profile['verifiedEmail']
     #print context.profile
     raise HTTPFound('/')
+
+def process_social_login(user_data):
+    # grab a handle to the database
+    db = mdb(request)
 
 @view_config(context='velruse.AuthenticationDenied', renderer="denied.mak")
 def login_denied_view(request):

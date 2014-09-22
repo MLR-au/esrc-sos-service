@@ -8,7 +8,7 @@ import collections
 from pyramid.httpexceptions import HTTPBadRequest
 
 import logging
-log = logging.getLogger('essos')
+log = logging.getLogger(__name__)
 
 
 class ConfigBase:

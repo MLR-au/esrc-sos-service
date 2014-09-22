@@ -3,7 +3,7 @@ from pymongo.errors import ConnectionFailure
 from pyramid.httpexceptions import HTTPInternalServerError
 import time
 import logging
-log = logging.getLogger('essos')
+log = logging.getLogger(__name__)
 
 def MongoDBConnection(request):
     client = request.registry.app_config['mongodb']['client']

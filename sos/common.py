@@ -8,7 +8,7 @@ from pyramid.httpexceptions import (
 )
 from pyramid.response import Response
 import logging
-log = logging.getLogger('essos')
+log = logging.getLogger(__name__)
 
 import ast
 import os

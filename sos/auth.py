@@ -4,7 +4,7 @@ import sys
 import collections
 
 import logging
-log = logging.getLogger('essos')
+log = logging.getLogger(__name__)
 
 class LDAP:
     def __init__(self, servers, base, binduser, bindpass):

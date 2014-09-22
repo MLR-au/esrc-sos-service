@@ -13,9 +13,9 @@
     <meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT" />
     <meta http-equiv="pragma" content="no-cache" />
 
-    <link rel="shortcut icon" href="${request.static_url('essos:static/pyramid-16x16.png')}">
+    <link rel="shortcut icon" href="${request.static_url('sos/pyramid-16x16.png')}">
 
-    <title>eSRC Single Sign on Service (ESSOS)</title>
+    <title>eSRC Sign on Service (SOS)</title>
 
     <!-- Bootstrap core CSS -->
     <link href="/static/bootstrap.min.css" rel="stylesheet">
@@ -27,7 +27,7 @@
         <div class="row">
             <div class="col-sm-12 col-md-12 col-lg-12 text-center">
                 <h3><a href="http://www.esrc.unimelb.edu.au" target="_blank">eScholarship Research Centre</a></h3>
-                <h4>Single Sign on Service</h4>
+                <h4>Sign on Service</h4>
             </div>
         </div>
         <div class="row">

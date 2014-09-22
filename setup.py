@@ -15,9 +15,9 @@ requires = [
     'waitress',
     ]
 
-setup(name='essos',
+setup(name='sos',
       version='0.0',
-      description='essos',
+      description='sos',
       long_description=README + '\n\n' + CHANGES,
       classifiers=[
         "Programming Language :: Python",
@@ -34,9 +34,9 @@ setup(name='essos',
       zip_safe=False,
       install_requires=requires,
       tests_require=requires,
-      test_suite="essos",
+      test_suite="sos",
       entry_points="""\
       [paste.app_factory]
-      main = essos:main
+      main = sos:main
       """,
       )
