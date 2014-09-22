@@ -13,8 +13,6 @@
     <meta http-equiv="expires" content="Tue, 01 Jan 1980 1:00:00 GMT" />
     <meta http-equiv="pragma" content="no-cache" />
 
-    <link rel="shortcut icon" href="${request.static_url('sos/pyramid-16x16.png')}">
-
     <title>eSRC Sign on Service (SOS)</title>
 
     <!-- Bootstrap core CSS -->
