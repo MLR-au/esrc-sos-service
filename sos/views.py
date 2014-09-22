@@ -7,6 +7,10 @@ from pyramid.httpexceptions import (
     HTTPUnauthorized
 )
 import ast
+import jwt 
+import Crypto.PublicKey.RSA as RSA
+import json
+import traceback
 
 import auth
 import time
@@ -137,8 +141,7 @@ def login_staff(request):
             'fullname': user_data.fullname,
             'token': token,
             'groups': user_data.groups,
-            'createdAt': datetime.utcnow(),
-            'expiresAt': datetime.utcnow() + timedelta(seconds = session_lifetime)
+            'createdAt': datetime.strftime(datetime.now(), "%s"),
         })
         try:
             db.session.ensure_index('createdAt', expireAfterSeconds = session_lifetime)
@@ -156,7 +159,7 @@ def login_staff(request):
         db.code.insert({
             'token': token,
             'code': otc,
-            'createdAt': datetime.utcnow()
+            'createdAt': datetime.strftime(datetime.now(), "%s")
         })
         try:
             db.code.ensure_index('createdAt', expireAfterSeconds = 5)
@@ -223,45 +226,101 @@ def retrieve_token(request):
     if code == None:
         raise HTTPUnauthorized
 
-    log.debug("Code: %s" % code)
-
     # grab a handle to the database
     db = mdb(request)
 
     # use the code to lookup the token
     doc = db.code.find_one({ 'code': code })
 
-    if doc is not None:
-        # delete the code
-        db.code.remove({ 'code': code })
-        return doc['token']
-    raise HTTPUnauthorized
+    if doc is None:
+        # no document found for code
+        log.debug("Code: %s not found. Raising Unauthorized" % code)
+        raise HTTPUnauthorized
 
+    # delete the code
+    log.debug('Removing OTC')
+    db.code.remove({ 'code': code })
+
+    # use the token to get the user data
+    token = doc['token']
+
+    doc = db.session.find_one({ 'token': token })
+    if doc is None:
+        # no document found for token
+        log.debug("Couldn't find session for token. Raising Unauthorized.")
+        raise HTTPUnauthorised
+
+    # load the pub and private keys
+    path = os.path.dirname(request.registry.settings.get('app.config'))
+    config = request.registry.app_config['general']
+
+    f = open(os.path.join(path, config['jwt.priv']), 'r')
+    private_key = f.read()
+    f.close()
+
+    private_key = RSA.importKey(private_key)
+    #print dir(private_key)
+
+    user_data = {
+        'username': doc['username'],
+        'fullname': doc['fullname'],
+        'groups': doc['groups'],
+        'token': doc['token']
+    }
+
+    # encrypt the payload
+
+    # generate the jwt
+    session_lifetime = int(request.registry.app_config['general']['session.lifetime'])
+    log.debug("Creating JWT for user.")
+    token = jwt.generate_jwt(user_data, private_key, 'PS256', timedelta(seconds=session_lifetime))
+
+    log.debug("Returning JWT. ")
+    return token
 
 @view_config(route_name="validate_token", request_method="POST", renderer='json')
 def validate_token(request):
-    log.debug('Validate token method called')
+    log.debug('Validate token method called.')
     if not verify_caller(request, request.referrer):
+        log.debug("Service not useable by you! %s" % request.referrer)
         raise HTTPUnauthorized
 
     try:
         token = request.json_body['data']['token']
     except:
+        log.debug("No token sent. Raising unauthorized.")
+        raise HTTPUnauthorized
+
+    # load the pub and private keys
+    path = os.path.dirname(request.registry.settings.get('app.config'))
+    config = request.registry.app_config['general']
+
+    f = open(os.path.join(path, config['jwt.pub']), 'r')
+    public_key = f.read()
+    f.close()
+
+    public_key = RSA.importKey(public_key)
+    #print dir(public_key)
+
+    # generate the jwt
+    try:
+        log.debug("Verifying JWT.")
+        headers, claims = jwt.process_jwt(json.dumps(token))
+    except:
+        log.debug("Couldn't verify JWT. Raising unauthorised.")
         raise HTTPUnauthorized
 
     # grab a handle to the database
     db = mdb(request)
 
-    doc = db.session.find_one({ 'token': token })
-    log.debug('Validate token method returning')
-    if doc is not None:
-        return {
-            'username': doc['username'],
-            'fullname': doc['fullname'],
-            'expiresAt': str(doc['expiresAt'])
-        }
-
-    else:
-        log.debug('Forbidden')
+    log.debug("Checking auth token still valid.")
+    token = claims['token'] 
+    doc =  db.session.find_one({ 'token': token })
+    if doc is None:
+        log.debug("No session found for auth token.")
         raise HTTPUnauthorized
+
+    log.debug("Token valid. Session still ok.")
+    raise HTTPOk
+
 
