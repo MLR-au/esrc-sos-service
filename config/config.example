@@ -15,7 +15,9 @@ session.lifetime:   300
 apps:               apps
 
 ## JSON Web Token (JWT) keypair
-###
+## Generate a keypair in the same directory as this configuration file. Don't
+##  set a password on the private key.
+##  ssh-keygen -t rsa -b 2048 -C 'jwt-key-pair' -f jwt-key
 jwt.pub:            jwt-key.pub
 jwt.priv:           jwt-key
 
