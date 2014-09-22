@@ -52,6 +52,8 @@ class Config(ConfigBase):
                 'admin.app': self.get('General', 'admin.app'),
                 'session.lifetime': self.get('General', 'session.lifetime'),
                 'apps': self.get('General', 'apps'),
+                'jwt.pub': self.get('General', 'jwt.pub'),
+                'jwt.priv': self.get('General', 'jwt.priv'),
                 'lockout.time': self.get('General', 'lockout.time')
             },
             'ldap': {

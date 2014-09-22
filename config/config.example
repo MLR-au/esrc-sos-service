@@ -14,6 +14,11 @@ session.lifetime:   300
 ##  configurations.
 apps:               apps
 
+## JSON Web Token (JWT) keypair
+###
+jwt.pub:            jwt-key.pub
+jwt.priv:           jwt-key
+
 ## IP address lockout time
 ### Slow the hackers down by this amount of time - don't bother checking or even
 ###  responding. This is time in seconds.
