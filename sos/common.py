@@ -15,6 +15,11 @@ import os
 from urlparse import urlparse
 from connectors import MongoDBConnection as mdb
 
+import jwt
+import Crypto.PublicKey.RSA as RSA
+import json
+import traceback
+
 from config import AppsConfig
 
 def get_app_data(request):
@@ -28,12 +33,18 @@ def get_app_data(request):
 
 def verify_caller(request, r):
     authed_app = False
+
+    # if r has been provided
     if r is not None:
-        apps = get_app_data(request)
-    
-        for app in apps:
-            if compare(r, app.url):
-                authed_app = True
+
+        # does r match the referrer?
+        if compare(r, request.referer):
+
+            # is r known to us as an app
+            apps = get_app_data(request)
+            for app in apps:
+                if compare(r, app.url):
+                    authed_app = True
 
     return authed_app
 
@@ -54,6 +65,13 @@ def get_app_allow(request, r):
     for app in apps:
         if compare(r, app.url):
             return app.allow
+
+def get_app_admins(request, r):
+    apps = get_app_data(request)
+    for app in apps:
+        if compare(r, app.url):
+            return app.admins
+
 
 def compare(a, b):
     # expects a couple of urls - urlparse will be used to 
@@ -76,4 +94,45 @@ def lockout_ip(request):
             'attempts': [ datetime.utcnow() ]
         })
     
-    
+def verify_session(request):
+
+    # get the token or raise Unauthorized if none
+    try:
+        token = request.headers['Authorization']
+        token = token.split()[1]
+    except:
+        log.debug("Couldn't get token from headers")
+        raise HTTPUnauthorized
+
+    # load the pub and private keys
+    path = os.path.dirname(request.registry.settings.get('app.config'))
+    config = request.registry.app_config['general']
+
+    f = open(os.path.join(path, config['jwt.pub']), 'r')
+    public_key = f.read()
+    f.close()
+
+    public_key = RSA.importKey(public_key)
+    #print dir(public_key)
+
+    # verify the jwt
+    try:
+        log.debug("Verifying JWT.")
+        headers, claims = jwt.process_jwt(json.dumps(token))
+        log.debug(claims)
+    except:
+        log.debug("Couldn't verify JWT. Raising unauthorised.")
+        raise HTTPUnauthorized
+
+    # grab a handle to the database
+    db = mdb(request)
+
+    log.debug("Checking auth token still valid.")
+    token = claims['token']
+    doc =  db.session.find_one({ 'token': token })
+    if doc is None:
+        log.debug("No session found for auth token.")
+        raise HTTPUnauthorized
+
+    return claims
+

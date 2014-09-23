@@ -43,11 +43,17 @@ def main(global_config, **settings):
     config.add_route('home', '/')
     config.add_route('health_check', '/health-check')
 
+    # login routes
     config.add_route('login_staff', '/login/staff')
     config.add_route('login_google', '/login/google')
     config.add_route('login_linkedin', '/login/linkedin')
 
+    # retrieve / validate tokens
     config.add_route('retrieve_token', '/token/{code}')
     config.add_route('validate_token', '/token')
+
+    # admin components
+    config.add_route('admin_users', '/admin/users/{user}')
+
     config.scan()
     return config.make_wsgi_app()

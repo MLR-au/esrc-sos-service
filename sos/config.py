@@ -83,11 +83,12 @@ class AppsConfig(ConfigBase):
             sys.exit()
 
     def load(self):
-        conf = collections.namedtuple('appsconf', [ 'name', 'url', 'description', 'login_callback', 'forbidden_callback', 'allow' ])
+        conf = collections.namedtuple('appsconf', [ 'name', 'url', 'description', 'login_callback', 'forbidden_callback', 'allow', 'admins' ])
         return conf(self.get('General', 'name'), 
                     self.get('General', 'url'), 
                     self.get('General', 'description'),
                     self.get('General', 'login_callback'),
                     self.get('General', 'forbidden_callback'),
-                    self.get('General', 'allow')
+                    self.get('General', 'allow', aslist=True),
+                    self.get('General', 'admins', aslist=True)
                     )

@@ -73,6 +73,7 @@ def home(request):
 
     # is the redirecting app authorised? if not - redirect to home
     if not verify_caller(request, r):
+        log.debug("Service not useable by you! %s" % r)
         raise HTTPForbidden
 
     try:
@@ -96,7 +97,6 @@ def login_staff(request):
     lc = request.registry.app_config['ldap']
     ldap = auth.LDAP(lc['servers'], lc['base'], lc['binduser'], lc['bindpass'])
     result = ldap.authenticate(request.POST['username'], request.POST['password'])
-
 
     # if 'not result' means they didn't auth successfully so send
     #  them back to the start (to try again) with a marker (e=True)
@@ -226,6 +226,14 @@ def retrieve_token(request):
     if code == None:
         raise HTTPUnauthorized
 
+    # Is the caller allowed?
+    r = request.GET.get('r')
+    if not verify_caller(request, r):
+        log.debug("Service not useable by you! %s" % request.referrer)
+        raise HTTPUnauthorized
+
+    log.debug("Retrieve token for %s with %s" % (r, code))
+
     # grab a handle to the database
     db = mdb(request)
 
@@ -261,10 +269,15 @@ def retrieve_token(request):
     private_key = RSA.importKey(private_key)
     #print dir(private_key)
 
+    admins = get_app_admins(request, r)
+    is_admin = False
+    for g in doc['groups']:
+        if g in admins:
+            is_admin = True
+
     user_data = {
-        'username': doc['username'],
         'fullname': doc['fullname'],
-        'groups': doc['groups'],
+        'isAdmin': is_admin,
         'token': doc['token']
     }
 
@@ -278,49 +291,14 @@ def retrieve_token(request):
     log.debug("Returning JWT. ")
     return token
 
-@view_config(route_name="validate_token", request_method="POST", renderer='json')
+@view_config(route_name="validate_token", request_method="GET", renderer='json')
 def validate_token(request):
     log.debug('Validate token method called.')
-    if not verify_caller(request, request.referrer):
-        log.debug("Service not useable by you! %s" % request.referrer)
-        raise HTTPUnauthorized
 
-    try:
-        token = request.json_body['data']['token']
-    except:
-        log.debug("No token sent. Raising unauthorized.")
-        raise HTTPUnauthorized
-
-    # load the pub and private keys
-    path = os.path.dirname(request.registry.settings.get('app.config'))
-    config = request.registry.app_config['general']
-
-    f = open(os.path.join(path, config['jwt.pub']), 'r')
-    public_key = f.read()
-    f.close()
-
-    public_key = RSA.importKey(public_key)
-    #print dir(public_key)
-
-    # generate the jwt
-    try:
-        log.debug("Verifying JWT.")
-        headers, claims = jwt.process_jwt(json.dumps(token))
-    except:
-        log.debug("Couldn't verify JWT. Raising unauthorised.")
-        raise HTTPUnauthorized
-
-    # grab a handle to the database
-    db = mdb(request)
-
-    log.debug("Checking auth token still valid.")
-    token = claims['token'] 
-    doc =  db.session.find_one({ 'token': token })
-    if doc is None:
-        log.debug("No session found for auth token.")
-        raise HTTPUnauthorized
+    # verify the token and session
+    claims = verify_session(request)
 
     log.debug("Token valid. Session still ok.")
-    raise HTTPOk
+    return { 'claims': claims }
 
 
