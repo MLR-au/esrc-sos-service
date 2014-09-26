@@ -1,6 +1,6 @@
 from pyramid.config import Configurator
 from pyramid.paster import setup_logging
-from pyramid.renderers import JSONP
+from pyramid.renderers import JSON, JSONP
 
 from config import Config as appConfig
 
@@ -8,6 +8,7 @@ from connectors import MongoBackend
 import auth_providers
 
 from pyramid.session import SignedCookieSessionFactory
+from bson import json_util
 
 def init_mongodb_connection(conf):
     m = MongoBackend()
@@ -38,6 +39,7 @@ def main(global_config, **settings):
     config.include('pyramid_mako')
     config.add_static_view('static', 'static', cache_max_age=3600)
 
+    config.add_renderer('mongojson', JSON(default=json_util.default))
     config.add_renderer('jsonp', JSONP(param_name='callback'))
 
     config.add_route('home', '/')
@@ -53,7 +55,9 @@ def main(global_config, **settings):
     config.add_route('validate_token', '/token')
 
     # admin components
-    config.add_route('admin_users', '/admin/users/{user}')
+    config.add_route('admin_check_email', '/admin/email/{email}')
+    config.add_route('admin_users', '/admin/users')
+    config.add_route('admin_user', '/admin/user/{user}')
 
     config.scan()
     return config.make_wsgi_app()

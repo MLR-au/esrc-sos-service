@@ -4,6 +4,8 @@ import sys
 import os.path
 import ConfigParser
 import collections
+import traceback
+import ast
 
 from pyramid.httpexceptions import HTTPBadRequest
 
@@ -83,12 +85,15 @@ class AppsConfig(ConfigBase):
             sys.exit()
 
     def load(self):
-        conf = collections.namedtuple('appsconf', [ 'name', 'url', 'description', 'login_callback', 'forbidden_callback', 'allow', 'admins' ])
+        conf = collections.namedtuple('appsconf', 
+            [ 'name', 'url', 'description', 'login_callback', 'forbidden_callback', 'allow', 'deny_social', 'admins' ]
+        )
         return conf(self.get('General', 'name'), 
                     self.get('General', 'url'), 
                     self.get('General', 'description'),
                     self.get('General', 'login_callback'),
                     self.get('General', 'forbidden_callback'),
                     self.get('General', 'allow', aslist=True),
+                    ast.literal_eval(self.get('General', 'deny_social')),
                     self.get('General', 'admins', aslist=True)
                     )

@@ -296,7 +296,7 @@ def validate_token(request):
     log.debug('Validate token method called.')
 
     # verify the token and session
-    claims = verify_session(request)
+    claims = verify_token(request)
 
     log.debug("Token valid. Session still ok.")
     return { 'claims': claims }

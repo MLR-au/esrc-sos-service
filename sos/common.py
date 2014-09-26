@@ -22,13 +22,14 @@ import traceback
 
 from config import AppsConfig
 
-def get_app_data(request):
+def get_app_data(request, except_social=False):
     app_configs = os.path.join(os.path.dirname(request.registry.settings['app.config']), request.registry.app_config['general']['apps'])
     apps = []
     for f in os.listdir(app_configs):
         c = AppsConfig(os.path.join(app_configs, f))
         d = c.load()
-        apps.append(d)
+        if not (except_social and d.deny_social):
+            apps.append(d)
     return apps
 
 def verify_caller(request, r):
@@ -94,7 +95,7 @@ def lockout_ip(request):
             'attempts': [ datetime.utcnow() ]
         })
     
-def verify_session(request):
+def verify_token(request):
 
     # get the token or raise Unauthorized if none
     try:
@@ -119,7 +120,7 @@ def verify_session(request):
     try:
         log.debug("Verifying JWT.")
         headers, claims = jwt.process_jwt(json.dumps(token))
-        log.debug(claims)
+        #log.debug(claims)
     except:
         log.debug("Couldn't verify JWT. Raising unauthorised.")
         raise HTTPUnauthorized
