@@ -65,7 +65,7 @@ def admin_users_get(request):
     apps = get_app_data(request, except_social=True)
     apps = [ { 'name': a.name, 'permission': None } for a in apps ]
     try:
-        user_accounts = db.profiles.find()
+        user_accounts = db.profiles.find().sort('username', pymongo.ASCENDING)
         users = []
         for u in user_accounts:
             user_id = u['_id']
@@ -97,7 +97,6 @@ def admin_users_get(request):
 
             users.append(user)
 
-        print users
         return { 'users': users }
 
     except:
