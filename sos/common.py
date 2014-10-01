@@ -37,15 +37,11 @@ def verify_caller(request, r):
 
     # if r has been provided
     if r is not None:
-
-        # does r match the referrer?
-        if compare(r, request.referer):
-
-            # is r known to us as an app
-            apps = get_app_data(request)
-            for app in apps:
-                if compare(r, app.url):
-                    authed_app = True
+        # is r known to us as an app
+        apps = get_app_data(request)
+        for app in apps:
+            if compare(r, app.url):
+                authed_app = True
 
     return authed_app
 
@@ -73,6 +69,12 @@ def get_app_admins(request, r):
         if compare(r, app.url):
             return app.admins
 
+def get_app_name(request, r):
+    apps = get_app_data(request, except_social=True)
+    for app in apps:
+        if compare(r, app.url):
+            return app.name
+
 
 def compare(a, b):
     # expects a couple of urls - urlparse will be used to 
@@ -96,7 +98,19 @@ def lockout_ip(request):
         })
     
 def verify_token(request):
+    """Verify a token set in the headers
 
+    Expects to find a header 'Authorization' in the form:
+        Bearer (JSON Web Token)
+
+    If header not found or doesn't verify raises HTTPUnauthorized.
+
+    If JWT verifies auth token is checked against the server side session.
+    If no session, raises HTTPUnauthorised.
+
+    If all is well, returns the token claims.
+
+    """
     # get the token or raise Unauthorized if none
     try:
         token = request.headers['Authorization']
