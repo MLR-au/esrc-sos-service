@@ -141,8 +141,11 @@ def login_staff(request):
             'fullname': user_data.fullname,
             'token': token,
             'groups': user_data.groups,
-            'createdAt': datetime.strftime(datetime.now(), "%s"),
+            'createdAt': datetime.utcnow()
         })
+        ### in order for the document to expire the indexed field must be a 
+        ###  UTC timestamp. See pymongo docs for createIndex, ensureIndex
+        ### http://api.mongodb.org/python/current/api/pymongo/collection.html
         try:
             db.session.ensure_index('createdAt', expireAfterSeconds = session_lifetime)
         except OperationFailure:
@@ -159,7 +162,7 @@ def login_staff(request):
         db.code.insert({
             'token': token,
             'code': otc,
-            'createdAt': datetime.strftime(datetime.now(), "%s")
+            'createdAt': datetime.utcnow()
         })
         try:
             db.code.ensure_index('createdAt', expireAfterSeconds = 5)
