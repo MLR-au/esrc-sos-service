@@ -58,7 +58,14 @@ def health_check(request):
 
 @view_config(route_name='home', request_method="GET", renderer='templates/home.mak')
 def home(request):
-    """ """
+    """The login page
+
+    @method: GET
+    @params:
+    - GET: r - the redirect URL (the calling app)
+    - GET: e - whether the user login failed
+    
+    """
     # get the url params
     #  if not r param: raise HTTPForbidden
 
@@ -76,6 +83,9 @@ def home(request):
         log.debug("Service not useable by you! %s" % r)
         raise HTTPForbidden
 
+    # store the name of the requested app - we need to redirect to it
+    request.session['r'] = r
+
     try:
         # if REMOTE_ADDR is not set in the environment then we have to wonder what the
         #  hell is going in. So - if we get an exception here, then the except clause
@@ -87,6 +97,16 @@ def home(request):
 
 @view_config(route_name='login_staff', request_method="POST", renderer='json')
 def login_staff(request):
+    """Handle a staff login against LDAP
+
+    HTTPForbidden raised if any params missing.
+
+    @method: POST
+    @params:
+    - POST: username, 
+    - POST: password
+    - POST: r
+    """
     if (not request.POST.get('username') or not request.POST.get('password')):
         raise HTTPForbidden
 
@@ -109,6 +129,83 @@ def login_staff(request):
     user_data = ldap.get_user_data()
     log.debug(user_data)
 
+    otc = create_session(request, user_data.username, user_data.fullname, user_data.groups)
+
+    # is the user actually allowed to access this app?
+    allowed = False
+    app_groups_allowed = get_app_allow(request, r)
+    for g in user_data.groups:
+        if g in app_groups_allowed:
+            allowed = True
+
+    # handle the login
+    if allowed:
+        access_allowed(request, r, otc)
+    else:
+        access_denied(request, r)
+
+@view_config(context='velruse.providers.google_oauth2.GoogleAuthenticationComplete')
+def google_login_complete(request):
+    session = request.session
+    context = request.context
+    #for k, v in context.profile.items():
+    #    print k, v
+
+    username = context.profile['verifiedEmail']
+    fullname = context.profile['displayName']
+
+    # verify the user has a profile - raise forbidden otherwise
+    db = mdb(request)
+
+    doc = db.profiles.find_one({ '$or': [
+        { 'primaryEmail': username }, { 'secondaryEmail': username }
+    ]})
+    if doc is None:
+        access_denied(request, request.session['r'])
+
+    # get app data
+    app = get_app_name(request, request.session['r'])
+
+    if doc['apps'][app] == 'allow':
+        # verify user allowed to use app - redirect to forbidden otherwise
+        # if allowed - create session and get on with it
+        otc = create_session(request, username, fullname)
+        access_allowed(request, request.session['r'], otc)
+    else:
+        access_denied(request, request.session['r'])
+
+@view_config(context='velruse.providers.linkedin.LinkedInAuthenticationComplete')
+def linkedin_login_complete(request):
+    session = request.session
+    context = request.context
+    #for k, v in context.profile.items():
+    #    print k, v
+
+    username = context.profile['emails'][0]['value']
+    fullname = context.profile['name']['formatted']
+
+    # verify the user has a profile - raise forbidden otherwise
+    db = mdb(request)
+
+    doc = db.profiles.find_one({ '$or': [
+        { 'primaryEmail': username }, { 'secondaryEmail': username }
+    ]})
+    if doc is None:
+        access_denied(request, request.session['r'])
+
+    # get app data
+    app = get_app_name(request, request.session['r'])
+
+    if doc['apps'][app] == 'allow':
+        # verify user allowed to use app - redirect to forbidden otherwise
+        # if allowed - create session and get on with it
+        otc = create_session(request, username, fullname)
+        access_allowed(request, request.session['r'], otc)
+    else:
+        access_denied(request, request.session['r'])
+
+
+def create_session(request, username, fullname, groups=None):
     # grab a handle to the database
     db = mdb(request)
 
@@ -119,7 +216,7 @@ def login_staff(request):
     db.code.ensure_index('code', pymongo.ASCENDING)
 
     # is there already a session? if so - generate a code for that and return it
-    doc = db.session.find_one({ 'username': user_data.username })
+    doc = db.session.find_one({ 'username': username })
     try:
         # there's an existing session - generate a code for it and return that
         log.debug('Found existing session')
@@ -137,10 +234,10 @@ def login_staff(request):
             token = str(uuid.uuid4()).replace('-', '')
 
         db.session.insert({
-            'username': user_data.username,
-            'fullname': user_data.fullname,
+            'username': username,
+            'fullname': fullname,
             'token': token,
-            'groups': user_data.groups,
+            'groups': groups,
             'createdAt': datetime.utcnow()
         })
         ### in order for the document to expire the indexed field must be a 
@@ -170,53 +267,18 @@ def login_staff(request):
             db.code.drop_index('createdAt_1')
             db.code.ensure_index('createdAt', expireAfterSeconds = 5)
 
+    # return one time code to the caller
+    return otc
 
-    # is the user actually allowed to access this app?
-    allowed = False
-    app_groups_allowed = get_app_allow(request, r)
-    for g in user_data.groups:
-        if g in app_groups_allowed:
-            allowed = True
+def access_allowed( request, r, otc):
+    login_callback = get_login_callback(request, r)
+    log.debug('Returning one time code to the calling application')
+    raise HTTPFound("%s/%s" % (login_callback, otc))
 
-    if allowed:
-        login_callback = get_login_callback(request, r)
-        log.debug('Returning one time code to the calling application')
-        log.debug("Callback: %s/%s, Token: %s, One time code: %s" % (login_callback, otc, token, otc))
-        raise HTTPFound("%s/%s" % (login_callback, otc))
-    else:
-        log.debug('User not allowed to use this application')
-        forbidden_callback = get_forbidden_callback(request, r)
-        raise HTTPFound("%s" % (forbidden_callback))
-
-@view_config(context='velruse.providers.google_oauth2.GoogleAuthenticationComplete')
-def google_login_complete(request):
-    session = request.session
-    context = request.context
-    for k, v in context.profile.items():
-        print k, v
-
-    #session['isLoggedIn'] = True
-    #session['username'] = context.profile['displayName']
-    #session['email'] = context.profile['verifiedEmail']
-    raise HTTPFound('/')
-
-@view_config(context='velruse.providers.linkedin.LinkedInAuthenticationComplete')
-def linkedin_login_complete(request):
-    session = request.session
-    context = request.context
-    for k, v in context.profile.items():
-        print k, v
-
-    #session['isLoggedIn'] = True
-    #session['username'] = context.profile['name']['formatted']
-    #session['email'] = context.profile['emails'][0]['value']
-    #session['email'] = context.profile['verifiedEmail']
-    #print context.profile
-    raise HTTPFound('/')
-
-def process_social_login(user_data):
-    # grab a handle to the database
-    db = mdb(request)
+def access_denied(request, r):
+    log.debug('User not allowed to use this application')
+    forbidden_callback = get_forbidden_callback(request, r)
+    raise HTTPFound("%s" % (forbidden_callback))
 
 @view_config(context='velruse.AuthenticationDenied', renderer="denied.mak")
 def login_denied_view(request):
@@ -224,6 +286,16 @@ def login_denied_view(request):
 
 @view_config(route_name="retrieve_token", request_method="GET", renderer='json')
 def retrieve_token(request):
+    """Retrieve a token with the one time code
+
+    @method: GET
+    @params:
+    - GET: code: the one time code
+    - GET: r: the calling app
+
+    @returns
+    - JSON Web Token
+    """
     # is the code valid?
     code = request.matchdict.get('code')
     if code == None:
@@ -296,6 +368,13 @@ def retrieve_token(request):
 
 @view_config(route_name="validate_token", request_method="GET", renderer='json')
 def validate_token(request):
+    """Validate a token
+
+    Returns claims from token if token verifies successfully.
+
+    @params:
+    - None
+    """
     log.debug('Validate token method called.')
 
     # verify the token and session
