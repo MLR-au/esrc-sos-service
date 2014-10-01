@@ -142,12 +142,16 @@ class AdminUserMgt:
 
         try:
             # verify there isn't already a user with any of the defined email addresses.
-            doc = self.db.profiles.find_one( {'$or': 
-                [ { 'primaryEmail': self.request.json_body.get('primaryEmail') }, { 'secondaryEmail': self.request.json_body.get('secondaryEmail') } ] 
-            })
+            doc = self.db.profiles.find_one( { 'primaryEmail': self.request.json_body.get('primaryEmail') } )
             if doc is not None:
                 doc['_id'] = str(doc['_id'])
                 return { 'userdata': doc }
+
+            if self.request.json_body.get('secondaryEmail') is not None:
+                doc = self.db.profiles.find_one( { 'secondaryEmail': self.request.json_body.get('secondaryEmail') } )
+                if doc is not None:
+                    doc['_id'] = str(doc['_id'])
+                    return { 'userdata': doc }
 
             log.debug('Creating new user profile')
             # create the account
@@ -161,7 +165,7 @@ class AdminUserMgt:
             self.db.profiles.ensure_index('secondaryEmail', pymongo.ASCENDING)
 
             # return the updated profile data
-            doc = self.db.profiles.find_one({ 'primaryEmail': self.request.json_body('primaryEmail') })
+            doc = self.db.profiles.find_one({ 'primaryEmail': self.request.json_body.get('primaryEmail') })
             doc['_id'] = str(doc['_id'])
 
             return { 'userdata': doc }
