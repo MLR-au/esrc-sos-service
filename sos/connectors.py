@@ -19,7 +19,8 @@ class MongoBackend:
         try:
             self.client = MongoClient(conf['nodes'], replicaset=conf['replica_set'], w=conf['write_concern'])
             self.client.admin.authenticate(conf['user'], conf['pass'])
-            log.debug("Connection to Mongo cluster instantiated.")
+            log.info("Connection to Mongo cluster instantiated.")
         except ConnectionFailure:
             log.error("Can't connect to MongoDB at this time. Check the cluster.")
+            log.error("Raising HTTPInternalServerError")
             raise HTTPInternalServerError

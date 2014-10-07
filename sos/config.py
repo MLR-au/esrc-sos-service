@@ -51,7 +51,6 @@ class Config(ConfigBase):
         self.app_config = {
             'general': {
                 'admins': self.get('General', 'admins', aslist=True),
-                'admin.app': self.get('General', 'admin.app'),
                 'session.lifetime': self.get('General', 'session.lifetime'),
                 'apps': self.get('General', 'apps'),
                 'jwt.pub': self.get('General', 'jwt.pub'),

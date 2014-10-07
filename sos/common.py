@@ -43,7 +43,9 @@ def verify_caller(request, r):
             if compare(r, app.url):
                 authed_app = True
 
-    return authed_app
+    if not authed_app:
+        log.error("%s: Redirect URL doesn't match any known applications. Raising HTTPForbidden. r: %s" % (request.client_addr, r))
+        raise HTTPForbidden
 
 def get_login_callback(request, r):
     apps = get_app_data(request)
@@ -74,7 +76,6 @@ def get_app_name(request, r):
     for app in apps:
         if compare(r, app.url):
             return app.name
-
 
 def compare(a, b):
     # expects a couple of urls - urlparse will be used to 
@@ -116,7 +117,7 @@ def verify_token(request):
         token = request.headers['Authorization']
         token = token.split()[1]
     except:
-        log.debug("Couldn't get token from headers")
+        log.info("%s: Couldn't get token from headers" % request.client_addr)
         raise HTTPUnauthorized
 
     # load the pub and private keys
@@ -132,22 +133,20 @@ def verify_token(request):
 
     # verify the jwt
     try:
-        log.debug("Verifying JWT.")
+        log.info("%s: Verifying JWT." % request.client_addr)
         headers, claims = jwt.process_jwt(json.dumps(token))
-        #log.debug(claims)
     except:
-        log.debug("Couldn't verify JWT. Raising unauthorised.")
+        log.error("%s: Couldn't verify JWT. Raising HTTPUnauthorized." % request.client_addr)
         raise HTTPUnauthorized
 
     # grab a handle to the database
     db = mdb(request)
 
-    log.debug("Checking auth token still valid.")
+    log.info("%s: Checking auth token still valid." % request.client_addr)
     token = claims['token']
     doc =  db.session.find_one({ 'token': token })
     if doc is None:
-        log.debug("No session found for auth token.")
+        log.error("%s: No session found for auth token. Raising HTTPUnauthorized." % request.client_addr)
         raise HTTPUnauthorized
 
     return claims
-

@@ -53,7 +53,7 @@ def health_check(request):
         pass
     db.health_check.insert({ 'name': 'hc' })
 
-    log.debug('Mongo cluster seems to be in working order.')
+    log.info('Mongo cluster seems to be in working order.')
     return 'OK'
 
 @view_config(route_name='home', request_method="GET", renderer='templates/home.mak')
@@ -76,12 +76,11 @@ def home(request):
     e = request.GET.get('e')
 
     if r == None:
+        log.error("%s: No redirect URL specified. Raising HTTPForbidden." % request.client_addr)
         raise HTTPForbidden
 
     # is the redirecting app authorised? if not - redirect to home
-    if not verify_caller(request, r):
-        log.debug("Service not useable by you! %s" % r)
-        raise HTTPForbidden
+    verify_caller(request, r)
 
     # store the name of the requested app - we need to redirect to it
     request.session['r'] = r
@@ -90,9 +89,10 @@ def home(request):
         # if REMOTE_ADDR is not set in the environment then we have to wonder what the
         #  hell is going in. So - if we get an exception here, then the except clause
         #  is to raise a forbidden error.
-        log.info("Login redirect from: '%s', remote address: %s" % (r, request.environ['REMOTE_ADDR']))
+        log.info("%s: Login redirect from: '%s'" % (request.client_addr, r))
         return { 'r': r, 'e': e }
     except:
+        log.error("%s: Something wrong. Raising HTTPForbidden just in case." % request.client_addr)
         raise HTTPForbidden
 
 @view_config(route_name='login_staff', request_method="POST", renderer='json')
@@ -107,12 +107,18 @@ def login_staff(request):
     - POST: password
     - POST: r
     """
+    log.info("%s: Staff login attempted" % request.client_addr)
     if (not request.POST.get('username') or not request.POST.get('password')):
+        log.error("%s: POST missing username and / or password." % request.client_addr)
         raise HTTPForbidden
 
     if not request.POST.get('r'):
+        log.error("%s: POST missing redirect url." % request.client_addr)
         raise HTTPForbidden
     r = request.POST.get('r')
+
+    # is the redirecting app authorised? if not - redirect to home
+    verify_caller(request, r)
 
     lc = request.registry.app_config['ldap']
     ldap = auth.LDAP(lc['servers'], lc['base'], lc['binduser'], lc['bindpass'])
@@ -122,12 +128,12 @@ def login_staff(request):
     #  them back to the start (to try again) with a marker (e=True)
     #  to flag that something is wrong.
     if not result:
+        log.error("%s: Login failed for: %s." % (request.client_addr, request.POST['username']))
         raise HTTPFound("/?r=%s&e=True" % r)
 
     # if we get to here then the user has auth'ed successfully
     # grab the user data
     user_data = ldap.get_user_data()
-    log.debug(user_data)
 
     otc = create_session(request, user_data.username, user_data.fullname, user_data.groups)
 
@@ -140,8 +146,10 @@ def login_staff(request):
 
     # handle the login
     if allowed:
+        log.info("%s: User '%s' granted access to '%s'. " % (request.client_addr, request.POST['username'], r))
         access_allowed(request, r, otc)
     else:
+        log.info("%s: User '%s' denied access to '%s'." % (request.client_addr, request.POST['username'], r))
         access_denied(request, r)
 
 @view_config(context='velruse.providers.google_oauth2.GoogleAuthenticationComplete')
@@ -157,6 +165,7 @@ def google_login_complete(request):
     # verify the user has a profile - raise forbidden otherwise
     db = mdb(request)
 
+    log.info("%s: Google Login. Looking for profile with email '%s'" % (request.client_addr, username))
     doc = db.profiles.find_one({ '$or': [
         { 'primaryEmail': username }, { 'secondaryEmail': username }
     ]})
@@ -165,6 +174,11 @@ def google_login_complete(request):
 
     # get app data
     app = get_app_name(request, request.session['r'])
+
+    # if app is None - then a social user is trying to access the sign on service
+    #  management app and that's a no no.
+    if app is None:
+        access_denied(request, request.session['r'])
 
     if doc['apps'][app] == 'allow':
         # verify user allowed to use app - redirect to forbidden otherwise
@@ -196,6 +210,11 @@ def linkedin_login_complete(request):
     # get app data
     app = get_app_name(request, request.session['r'])
 
+    # if app is None - then a social user is trying to access the sign on service
+    #  management app and that's a no no.
+    if app is None:
+        access_denied(request, request.session['r'])
+
     if doc['apps'][app] == 'allow':
         # verify user allowed to use app - redirect to forbidden otherwise
         # if allowed - create session and get on with it
@@ -203,7 +222,6 @@ def linkedin_login_complete(request):
         access_allowed(request, request.session['r'], otc)
     else:
         access_denied(request, request.session['r'])
-
 
 def create_session(request, username, fullname, groups=None):
     # grab a handle to the database
@@ -219,11 +237,11 @@ def create_session(request, username, fullname, groups=None):
     doc = db.session.find_one({ 'username': username })
     try:
         # there's an existing session - generate a code for it and return that
-        log.debug('Found existing session')
         token = doc['token']
+        log.info("%s: Found existing session for %s." % (request.client_addr, username))
 
     except:
-        log.debug('Creating a new session')
+        log.info("%s: Creating a new session for %s." % (request.client_addr, username))
         # create a session for the user 
         session_lifetime = int(request.registry.app_config['general']['session.lifetime'])
         token = str(uuid.uuid4()).replace('-', '')
@@ -249,12 +267,12 @@ def create_session(request, username, fullname, groups=None):
             db.session.drop_index('createdAt_1')
             db.session.ensure_index('createdAt', expireAfterSeconds = session_lifetime)
     
-    log.debug("Looking up the session to see if there's already a one time code tied to it")
+    log.info("%s: Looking up the session to see if there's already a one time code tied to it." % request.client_addr)
     doc = db.code.find_one({ 'token': token })
     try:
         otc = doc['code']
     except:
-        log.debug('Generating new one time code')
+        log.info("%s: Generating new one time code." % request.client_addr)
         otc = str(uuid.uuid4()).replace('-', '')
         db.code.insert({
             'token': token,
@@ -270,18 +288,19 @@ def create_session(request, username, fullname, groups=None):
     # return one time code to the caller
     return otc
 
-def access_allowed( request, r, otc):
+def access_allowed(request, r, otc):
     login_callback = get_login_callback(request, r)
-    log.debug('Returning one time code to the calling application')
+    log.info("%s: Returning one time code to: %s." % (request.client_addr, r))
     raise HTTPFound("%s/%s" % (login_callback, otc))
 
 def access_denied(request, r):
-    log.debug('User not allowed to use this application')
+    log.info("%s: User not allowed to use this application: %s" % (request.client_addr, r))
     forbidden_callback = get_forbidden_callback(request, r)
     raise HTTPFound("%s" % (forbidden_callback))
 
 @view_config(context='velruse.AuthenticationDenied', renderer="denied.mak")
 def login_denied_view(request):
+    log.info("%s: Social login denied." % request.client_addr)
     raise HTTPUnauthorized
 
 @view_config(route_name="retrieve_token", request_method="GET", renderer='json')
@@ -299,15 +318,14 @@ def retrieve_token(request):
     # is the code valid?
     code = request.matchdict.get('code')
     if code == None:
+        log.error("%s: No code supplied. Raising HTTPUnauthorized" % request.client_addr)
         raise HTTPUnauthorized
 
     # Is the caller allowed?
     r = request.GET.get('r')
-    if not verify_caller(request, r):
-        log.debug("Service not useable by you! %s" % request.referrer)
-        raise HTTPUnauthorized
+    verify_caller(request, r)
 
-    log.debug("Retrieve token for %s with %s" % (r, code))
+    log.info("%s: Retrieve token for %s with %s" % (request.client_addr, r, code))
 
     # grab a handle to the database
     db = mdb(request)
@@ -317,11 +335,11 @@ def retrieve_token(request):
 
     if doc is None:
         # no document found for code
-        log.debug("Code: %s not found. Raising Unauthorized" % code)
+        log.info("%s: Code: %s not found. Raising Unauthorized" % (request.client_addr, code))
         raise HTTPUnauthorized
 
     # delete the code
-    log.debug('Removing OTC')
+    log.info("%s: Found token. Removing OTC" % request.client_addr)
     db.code.remove({ 'code': code })
 
     # use the token to get the user data
@@ -330,7 +348,7 @@ def retrieve_token(request):
     doc = db.session.find_one({ 'token': token })
     if doc is None:
         # no document found for token
-        log.debug("Couldn't find session for token. Raising Unauthorized.")
+        log.info("%s: Couldn't find session for token. Raising Unauthorized." % request.client_addr)
         raise HTTPUnauthorised
 
     # load the pub and private keys
@@ -352,7 +370,7 @@ def retrieve_token(request):
 
     user_data = {
         'fullname': doc['fullname'],
-        'isAdmin': is_admin,
+        'admin': is_admin,
         'token': doc['token']
     }
 
@@ -360,10 +378,10 @@ def retrieve_token(request):
 
     # generate the jwt
     session_lifetime = int(request.registry.app_config['general']['session.lifetime'])
-    log.debug("Creating JWT for user.")
+    log.info("%s: Creating JWT for user." % request.client_addr)
     token = jwt.generate_jwt(user_data, private_key, 'PS256', timedelta(seconds=session_lifetime))
 
-    log.debug("Returning JWT. ")
+    log.info("%s: Returning JWT." % request.client_addr)
     return token
 
 @view_config(route_name="validate_token", request_method="GET", renderer='json')
@@ -375,12 +393,12 @@ def validate_token(request):
     @params:
     - None
     """
-    log.debug('Validate token method called.')
+    log.info("%s: Validate token method called." % request.client_addr)
 
     # verify the token and session
     claims = verify_token(request)
 
-    log.debug("Token valid. Session still ok.")
+    log.info("%s: Token valid. Session still ok." % request.client_addr)
     return { 'claims': claims }
 
 
