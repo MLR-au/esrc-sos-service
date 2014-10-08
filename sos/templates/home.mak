@@ -17,7 +17,41 @@
 
     <!-- Bootstrap core CSS -->
     <link href="/static/bootstrap.min.css" rel="stylesheet">
+    <script src="/static/jquery.min.js"></script>
+    <script src="/static/spin.min.js"></script>
 
+    <script>
+
+        $(document).ready(function() {
+            $('#loadingIndicator').hide();
+            var opts = {
+              lines: 13, // The number of lines to draw
+              length: 20, // The length of each line
+              width: 5, // The line thickness
+              radius: 10, // The radius of the inner circle
+              corners: 1, // Corner roundness (0..1)
+              rotate: 0, // The rotation offset
+              direction: 1, // 1: clockwise, -1: counterclockwise
+              color: '#000', // #rgb or #rrggbb or array of colors
+              speed: 1, // Rounds per second
+              trail: 60, // Afterglow percentage
+              shadow: false, // Whether to render a shadow
+              hwaccel: false, // Whether to use hardware acceleration
+              className: 'spinner', // The CSS class to assign to the spinner
+              zIndex: 2e9, // The z-index (defaults to 2000000000)
+              top: '140px', // Top position relative to parent
+              left: '50%' // Left position relative to parent
+            };
+
+            $('.btn').click(function() {
+                $('#loginForms').hide();
+                $('#loadingIndicator').show();
+                var target = document.getElementById('spinner');
+                var spinner = new Spinner(opts).spin(target);
+            });
+        });
+        
+    </script>
   </head>
 
   <body>
@@ -41,7 +75,11 @@
         </div>
         <hr/>
         <div class="row" style="border: 2px solid grey; border-radius: 8px; margin: 1px;">
-            <div class="col-sm-6 col-md-6 col-lg-6">
+            <div class="col-sm-6 col-md-6 col-lg-6" id="loadingIndicator">
+                <div id="spinner"></div>
+                <p class="text-center">Logging you in. Just a moment...</p>
+            </div>
+            <div class="col-sm-6 col-md-6 col-lg-6" id="loginForms">
                 <h4 class="text-center">Login</h4>
                 <form role="form" action="/login/staff" method="POST">
                     <input type="hidden" name="r" value="${r}" >
