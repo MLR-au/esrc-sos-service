@@ -28,11 +28,9 @@ def admin_check_email(request):
     @ returns:
         { 'userdata': user data if email already in an existing profile }
     """
-    log.debug('GET: /admin/email/{email} - check email address')
-
     # verify the token and session
     claims = verify_token(request)
-    if not claims['isAdmin']:
+    if not claims['admin']:
         raise HTTPUnauthorised
 
     db = mdb(request)
@@ -53,55 +51,50 @@ def admin_users_get(request):
     @returns:
         { 'users': list of users }
     """
-    log.debug('GET: /admin/users')
 
     # verify the token and session
     claims = verify_token(request)
-    if not claims['isAdmin']:
+    if not claims['admin']:
         raise HTTPUnauthorised
 
     db = mdb(request)
 
     apps = get_app_data(request, except_social=True)
     apps = [ { 'name': a.name, 'permission': None } for a in apps ]
-    try:
-        user_accounts = db.profiles.find().sort('username', pymongo.ASCENDING)
-        users = []
-        for u in user_accounts:
-            user_id = u['_id']
-            user = u 
-            
-            # Build a new apps dictionary based on sos's configuration
-            user_apps = {}
-            for app in apps:
-                user_apps[app['name']] = 'deny'
 
-            # pull existing configuration back in
-            try:
-                for app in u['apps']:
-                    user_apps[app] = u['apps'][app]
-            except:
-                pass
-            user['apps'] = user_apps
-            user['_id'] = str(user['_id'])
-            
-            # save the updated apps dict back into the profile
-            db.profiles.update(
-                { '_id': ObjectId(user_id) },
-                { '$unset': { 'apps': "" }}
-            )
-            db.profiles.update(
-                { '_id': ObjectId(user_id) },
-                { '$set': { 'apps': user_apps }}
-            )
+    user_accounts = db.profiles.find().sort('username', pymongo.ASCENDING)
+    users = []
+    for u in user_accounts:
+        user_id = u['_id']
+        user = u 
+        
+        # Build a new apps dictionary based on sos's configuration
+        user_apps = {}
+        for app in apps:
+            user_apps[app['name']] = 'deny'
 
-            users.append(user)
+        # pull existing configuration back in
+        try:
+            for app in u['apps']:
+                user_apps[app] = u['apps'][app]
+        except:
+            pass
+        user['apps'] = user_apps
+        user['_id'] = str(user['_id'])
+        
+        # save the updated apps dict back into the profile
+        db.profiles.update(
+            { '_id': ObjectId(user_id) },
+            { '$unset': { 'apps': "" }}
+        )
+        db.profiles.update(
+            { '_id': ObjectId(user_id) },
+            { '$set': { 'apps': user_apps }}
+        )
 
-        return { 'users': users }
+        users.append(user)
 
-    except:
-        print '**', traceback.print_exc()
-        return {}
+    return { 'users': users }
 
 @view_defaults(route_name='admin_user', renderer='json')
 class AdminUserMgt:
@@ -111,7 +104,7 @@ class AdminUserMgt:
     def __init__(self, request):
         # verify the token and session
         self.claims = verify_token(request)
-        if not self.claims['isAdmin']:
+        if not self.claims['admin']:
             raise HTTPUnauthorised
 
         self.request = request
@@ -123,7 +116,7 @@ class AdminUserMgt:
 
         @params:
         """
-        log.debug('GET: /admin/user')
+        log.info('GET: /admin/user')
 
     @view_config(request_method='POST')
     def admin_user_post(self):
@@ -138,7 +131,6 @@ class AdminUserMgt:
         @returns:
         { 'userdata': user data object from mongo }
         """
-        log.debug('POST: /admin/user - create user account.')
 
         try:
             # verify there isn't already a user with any of the defined email addresses.
@@ -153,7 +145,7 @@ class AdminUserMgt:
                     doc['_id'] = str(doc['_id'])
                     return { 'userdata': doc }
 
-            log.debug('Creating new user profile')
+            log.info("%s: Creating new user profile." % self.request.client_addr)
             # create the account
             self.db.profiles.insert({
                 'username': self.request.json_body.get('username'),
@@ -170,8 +162,8 @@ class AdminUserMgt:
 
             return { 'userdata': doc }
         except:
-            log.debug("Something went wrong trying to create user profile for: %s" % request.json_body)
-            print traceback.print_exc()
+            log.error("%s: Something went wrong trying to create user profile for: %s" % (self.request.client_addr, selfrequest.json_body))
+            log.error(traceback.print_exc())
             raise HTTPInternalServerError
 
     @view_config(request_method='PUT')
@@ -186,7 +178,6 @@ class AdminUserMgt:
         @returns:
         { 'userdata': user data object from mongo }
         """
-        log.debug('PUT: /admin/user - update user account')
 
         try:
             user_id = self.request.matchdict.get('user')
@@ -198,10 +189,10 @@ class AdminUserMgt:
             if action == 'lockAccount':
                 if doc['status'] == 'enabled':
                     status = 'locked'
-                    log.debug("'%s (%s)' account locked ['%s]'" % (who, user_id, admin))
+                    log.info("%s: '%s (%s)' account locked by '%s'" % (self.request.client_addr, who, user_id, admin))
                 else:
                     status = 'enabled'
-                    log.debug("'%s (%s)' account unlocked ['%s]'" % (who, user_id, admin))
+                    log.info("%s: '%s (%s)' account unlocked by '%s'" % (self.request.client_addr, who, user_id, admin))
 
                 # update the user's profile
                 self.db.profiles.update(
@@ -211,7 +202,7 @@ class AdminUserMgt:
 
             elif action == 'denyAccess':
                 app = self.request.json_body.get('app')
-                log.debug("'%s (%s)' access to '%s' removed ['%s']" % (who, user_id, app, admin))
+                log.info("%s: '%s (%s)' access to '%s' removed by '%s'" % (self.request.client_addr, who, user_id, app, admin))
 
                 doc = self.db.profiles.find_one(
                     { '_id': ObjectId(user_id) },
@@ -228,7 +219,7 @@ class AdminUserMgt:
 
             elif action == 'allowAccess':
                 app = self.request.json_body.get('app')
-                log.debug("'%s (%s)' granted access to '%s' ['%s']" % (who, user_id, app, admin))
+                log.info("%s: '%s (%s)' granted access to '%s' by '%s'" % (self.request.client_addr, who, user_id, app, admin))
 
                 doc = self.db.profiles.find_one(
                     { '_id': ObjectId(user_id) },
@@ -265,15 +256,13 @@ class AdminUserMgt:
         { }
         """
 
-        log.debug('DELETE: /admin/user')
-
         try:
             user_id = self.request.matchdict.get('user')
             doc = self.db.profiles.find_one( { '_id': ObjectId(user_id) })
             who = doc['username']
             admin = self.claims['fullname']
 
-            log.debug("'%s (%s)' account deleted ['%s']" % (who, user_id, admin))
+            log.info("'%s (%s)' account deleted ['%s']" % (who, user_id, admin))
 
             result = self.db.profiles.remove( { '_id': ObjectId(self.request.matchdict['user']) })
             return {}
