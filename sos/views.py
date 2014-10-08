@@ -135,8 +135,6 @@ def login_staff(request):
     # grab the user data
     user_data = ldap.get_user_data()
 
-    otc = create_session(request, user_data.username, user_data.fullname, user_data.groups)
-
     # is the user actually allowed to access this app?
     allowed = False
     app_groups_allowed = get_app_allow(request, r)
@@ -147,6 +145,7 @@ def login_staff(request):
     # handle the login
     if allowed:
         log.info("%s: User '%s' granted access to '%s'. " % (request.client_addr, request.POST['username'], r))
+        otc = create_session(request, user_data.username, user_data.fullname, user_data.groups)
         access_allowed(request, r, otc)
     else:
         log.info("%s: User '%s' denied access to '%s'." % (request.client_addr, request.POST['username'], r))
