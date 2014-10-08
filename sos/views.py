@@ -201,6 +201,7 @@ def linkedin_login_complete(request):
     # verify the user has a profile - raise forbidden otherwise
     db = mdb(request)
 
+    log.info("%s: LinkedIn Login. Looking for profile with email '%s'" % (request.client_addr, username))
     doc = db.profiles.find_one({ '$or': [
         { 'primaryEmail': username }, { 'secondaryEmail': username }
     ]})

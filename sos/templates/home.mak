@@ -58,14 +58,12 @@
                 <hr/>
 
                 <form role="form" action="/login/google" method="POST">
-                    <input type="hidden" name="r" value="${r}" >
                     <button class="btn btn-default btn-block" type="submit">
                         <img src="/static/img/google.jpg" style="height: 20px;"/>&nbsp;Login with your Google account
                     </button>
                 </form>
                 <br/>
                 <form role="form" action="/login/linkedin" method="POST">
-                    <input type="hidden" name="r" value="${r}" >
                     <button class="btn btn-default btn-block" type="submit">
                         <img src="/static/img/linkedin.png" style="height: 20px;"/>&nbsp;Login with your LinkedIn account
                     </button>
