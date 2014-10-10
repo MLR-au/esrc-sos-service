@@ -1,0 +1,6 @@
+config/apps/
+config/config
+config/jwt-key
+config/jwt-key.pub
+sos.egg-info/
+sos/auth_providers.py
