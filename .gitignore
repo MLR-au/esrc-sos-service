@@ -4,3 +4,4 @@ config/jwt-key
 config/jwt-key.pub
 sos.egg-info/
 sos/auth_providers.py
+*.pyc
