@@ -181,11 +181,14 @@ def google_login_complete(request):
 
     if doc['apps'][app] == 'allow':
         # verify user allowed to use app - redirect to forbidden otherwise
-        # if allowed - create session and get on with it
-        otc = create_session(request, username, fullname, username)
-        access_allowed(request, request.session['r'], otc)
-    else:
-        access_denied(request, request.session['r'])
+        # check user account not locked
+        if doc['status'] != 'locked':
+            # create session and get on with it
+            otc = create_session(request, username, fullname, username)
+            access_allowed(request, request.session['r'], otc)
+
+    # if we get to here for any reason - access has been denied
+    access_denied(request, request.session['r'])
 
 @view_config(context='velruse.providers.linkedin.LinkedInAuthenticationComplete')
 def linkedin_login_complete(request):
@@ -217,11 +220,14 @@ def linkedin_login_complete(request):
 
     if doc['apps'][app] == 'allow':
         # verify user allowed to use app - redirect to forbidden otherwise
-        # if allowed - create session and get on with it
-        otc = create_session(request, username, fullname, username)
-        access_allowed(request, request.session['r'], otc)
-    else:
-        access_denied(request, request.session['r'])
+        # check user account not locked
+        if doc['status'] != 'locked':
+            # create session and get on with it
+            otc = create_session(request, username, fullname, username)
+            access_allowed(request, request.session['r'], otc)
+
+    # if we get to here for any reason - access has been denied
+    access_denied(request, request.session['r'])
 
 def create_session(request, username, fullname, email, groups=None):
     # grab a handle to the database
