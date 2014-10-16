@@ -1,5 +1,6 @@
+import sys
 from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure
+from pymongo.errors import ConnectionFailure, OperationFailure
 from pyramid.httpexceptions import HTTPInternalServerError
 import time
 import logging
@@ -22,5 +23,8 @@ class MongoBackend:
             log.info("Connection to Mongo cluster instantiated.")
         except ConnectionFailure:
             log.error("Can't connect to MongoDB at this time. Check the cluster.")
-            log.error("Raising HTTPInternalServerError")
-            raise HTTPInternalServerError
+            sys.exit()
+        except OperationFailure:
+            log.error("Can't connect to MongoDB at this time. Likely bad username / password.")
+            print sys.exc_info()[1]
+            sys.exit()

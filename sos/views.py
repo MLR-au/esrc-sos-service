@@ -145,7 +145,7 @@ def login_staff(request):
     # handle the login
     if allowed:
         log.info("%s: User '%s' granted access to '%s'. " % (request.client_addr, request.POST['username'], r))
-        otc = create_session(request, user_data.username, user_data.fullname, user_data.groups)
+        otc = create_session(request, user_data.username, user_data.fullname, user_data.email, user_data.groups)
         access_allowed(request, r, otc)
     else:
         log.info("%s: User '%s' denied access to '%s'." % (request.client_addr, request.POST['username'], r))
@@ -182,7 +182,7 @@ def google_login_complete(request):
     if doc['apps'][app] == 'allow':
         # verify user allowed to use app - redirect to forbidden otherwise
         # if allowed - create session and get on with it
-        otc = create_session(request, username, fullname)
+        otc = create_session(request, username, fullname, username)
         access_allowed(request, request.session['r'], otc)
     else:
         access_denied(request, request.session['r'])
@@ -218,12 +218,12 @@ def linkedin_login_complete(request):
     if doc['apps'][app] == 'allow':
         # verify user allowed to use app - redirect to forbidden otherwise
         # if allowed - create session and get on with it
-        otc = create_session(request, username, fullname)
+        otc = create_session(request, username, fullname, username)
         access_allowed(request, request.session['r'], otc)
     else:
         access_denied(request, request.session['r'])
 
-def create_session(request, username, fullname, groups=None):
+def create_session(request, username, fullname, email, groups=None):
     # grab a handle to the database
     db = mdb(request)
 
@@ -238,10 +238,10 @@ def create_session(request, username, fullname, groups=None):
     try:
         # there's an existing session - generate a code for it and return that
         token = doc['token']
-        log.info("%s: Found existing session for %s." % (request.client_addr, username))
+        log.info("%s: Found existing session for '%s'." % (request.client_addr, username))
 
     except:
-        log.info("%s: Creating a new session for %s." % (request.client_addr, username))
+        log.info("%s: Creating a new session for '%s'." % (request.client_addr, username))
         # create a session for the user 
         session_lifetime = int(request.registry.app_config['general']['session.lifetime'])
         token = str(uuid.uuid4()).replace('-', '')
@@ -254,6 +254,7 @@ def create_session(request, username, fullname, groups=None):
         db.session.insert({
             'username': username,
             'fullname': fullname,
+            'email': email,
             'token': token,
             'groups': groups,
             'createdAt': datetime.utcnow()
@@ -325,7 +326,7 @@ def retrieve_token(request):
     r = request.GET.get('r')
     verify_caller(request, r)
 
-    log.info("%s: Retrieve token for %s with %s" % (request.client_addr, r, code))
+    log.info("%s: Retrieve token for '%s'" % (request.client_addr, code))
 
     # grab a handle to the database
     db = mdb(request)
@@ -364,21 +365,22 @@ def retrieve_token(request):
 
     admins = get_app_admins(request, r)
     is_admin = False
-    for g in doc['groups']:
-        if g in admins:
-            is_admin = True
+    if doc['groups'] is not None:
+        for g in doc['groups']:
+            if g in admins:
+                is_admin = True
 
     user_data = {
         'fullname': doc['fullname'],
+        'email': doc['email'],
         'admin': is_admin,
         'token': doc['token']
     }
 
-    # encrypt the payload
 
     # generate the jwt
     session_lifetime = int(request.registry.app_config['general']['session.lifetime'])
-    log.info("%s: Creating JWT for user." % request.client_addr)
+    log.info("%s: Creating JWT for '%s'." % (request.client_addr, user_data['fullname']))
     token = jwt.generate_jwt(user_data, private_key, 'PS256', timedelta(seconds=session_lifetime))
 
     log.info("%s: Returning JWT." % request.client_addr)
@@ -398,7 +400,7 @@ def validate_token(request):
     # verify the token and session
     claims = verify_token(request)
 
-    log.info("%s: Token valid. Session still ok." % request.client_addr)
+    log.info("%s: Token for '%s (%s)' valid. Session still ok." % (request.client_addr, claims['fullname'], claims['email']))
     return { 'claims': claims }
 
 

@@ -89,8 +89,11 @@ class LDAP:
         return False
 
     def get_user_data(self):
-        user_data = collections.namedtuple('UserData', 'username, fullname, groups')
-        return user_data(self.data['uid'][0], self.data['cn'][0], self.groups)
+        user_data = collections.namedtuple('UserData', 'username, fullname, email, groups')
+        try:
+            return user_data(self.data['uid'][0], self.data['cn'][0], self.data['mail'][0], self.groups)
+        except:
+            return user_data(self.data['uid'][0], self.data['cn'][0], '', self.groups)
 
     def get_user_groups(self, username):
         """Return the groups this user is a member of"""

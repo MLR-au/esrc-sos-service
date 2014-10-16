@@ -133,8 +133,8 @@ def verify_token(request):
 
     # verify the jwt
     try:
-        log.info("%s: Verifying JWT." % request.client_addr)
         headers, claims = jwt.process_jwt(json.dumps(token))
+        log.info("%s: JWT verified." % request.client_addr)
     except:
         log.error("%s: Couldn't verify JWT. Raising HTTPUnauthorized." % request.client_addr)
         raise HTTPUnauthorized
@@ -142,11 +142,11 @@ def verify_token(request):
     # grab a handle to the database
     db = mdb(request)
 
-    log.info("%s: Checking auth token still valid." % request.client_addr)
+    log.info("%s: Checking auth token for '%s (%s)' still valid." % (request.client_addr, claims['fullname'], claims['email']))
     token = claims['token']
     doc =  db.session.find_one({ 'token': token })
     if doc is None:
-        log.error("%s: No session found for auth token. Raising HTTPUnauthorized." % request.client_addr)
+        log.error("%s: No session found for '%s (%s)'. Raising HTTPUnauthorized." % (request.client_addr, claims['fullname'], claims['email']))
         raise HTTPUnauthorized
 
     return claims
