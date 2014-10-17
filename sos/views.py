@@ -49,7 +49,7 @@ def health_check(request):
     except:
         raise HTTPInternalServerError
 
-    log.info('LDAP and Mongo cluster seem to be in working order.')
+    log.info('health-check: LDAP and Mongo cluster seem to be in working order.')
     return 'OK'
 
 @view_config(route_name='home', request_method="GET", renderer='templates/home.mak')
