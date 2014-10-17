@@ -102,9 +102,9 @@
                     </div>
                     <button class="btn btn-default btn-block">Login</button>
                 </form>
-                <hr/>
+                <hr style="border-color: #003268;"/>
                 <h5 class="text-center">OR</h5>
-                <hr/>
+                <hr style="border-color: #003268;"/>
 
                 <form role="form" action="/login/google" method="POST">
                     <button class="btn btn-default btn-block" type="submit">
@@ -121,10 +121,10 @@
             </div>
             <div class="col-sm-6 col-md-6 col-lg-6">
                 <h4 class="text-center">Help</h4>
-                <p class="text-muted">Staff should login using their eSRC user account and password. Some collaborators will
+                <p class="">Staff should login using their eSRC user account and password. Some collaborators will
                 also have a systems account and you should use this if you do.</p>
                 <hr/>
-                <p class="text-muted">Collaborators who don't have an eSRC account should use one of the supported external 
+                <p class="">Collaborators who don't have an eSRC account should use one of the supported external 
                 authentication providers noting that this will not automatically grant access. A staff member needs to have
                 granted you access before you can login to an application.
                 </p>
@@ -132,13 +132,13 @@
         </div>
         <hr/>
         <div class="row">
-            <div class="col-sm-12 col-md-12 col-lg-12">
-                <h5>Why are you here?</h5>
-                <p class="text-muted">The eScholarship Research Centre operates a number services on behalf of staff and collaborators. In order to
+            <div class="col-sm-12 col-md-12 col-lg-12 alert alert-info">
+                <h5>Why am I here?</h5>
+                <p class="">The eScholarship Research Centre operates a number services on behalf of staff and collaborators. In order to
                 provide a unified experience across those services, a central sign on service (this site) has been 
                 developed. If you try to access an eSRC service and end up here you can confirm that this is the expected behaviour
                 by checking that the site you came from is shown at the top of the page.</p>
-                <p class="text-muted">After you've logged in successfully you will automatically be redirected to the service you came from so that you
+                <p class="">After you've logged in successfully you will automatically be redirected to the service you came from so that you
                 can continue with your work.</p>
             </div>
         </div>
