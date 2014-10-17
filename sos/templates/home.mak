@@ -52,20 +52,31 @@
         });
         
     </script>
+    <style>
+        body {
+            background-color: #efefea;
+        }
+    </style>
   </head>
 
   <body>
+    <div class="row" style="background-color: #003268; height: 20px;">
+    </div>
     <div class="container">
         <div class="row">
             <div class="col-sm-12 col-md-12 col-lg-12 text-center">
-                <h3><a href="http://www.esrc.unimelb.edu.au" target="_blank">eScholarship Research Centre</a></h3>
-                <h4>Sign on Service</h4>
+                <h3 style="text-shadow: 1px -1px 2px #595959; color: #658095; line-height: 1.1;">
+                    <span style="color: #3d4343;">eScholarship Research Centre</span>
+                </h3>
+                <h2 style="text-shadow: 1px -1px 2px #595959; color: #658095; line-height: 1.1;">
+                    <span style="color: #3d4343;">Sign on Service</span>
+                </h2>
             </div>
         </div>
+        <hr style="border-color: #003268;" />
         <div class="row">
             <div class="col-sm-12 col-md-12 col-lg-12 text-center">
                 %if r != '':
-                    <hr/>
                     <p>You came from: <a href="${r}">${r}</a></p>
                 %endif
                 %if e == 'True':
@@ -73,7 +84,7 @@
                 %endif
             </div>
         </div>
-        <hr/>
+        <hr style="border-color: #003268;" />
         <div class="row" style="border: 2px solid grey; border-radius: 8px; margin: 1px;">
             <div class="col-sm-6 col-md-6 col-lg-6" id="loadingIndicator">
                 <div id="spinner"></div>
@@ -114,9 +125,8 @@
                 also have a systems account and you should use this if you do.</p>
                 <hr/>
                 <p class="text-muted">Collaborators who don't have an eSRC account should use one of the supported external 
-                authentication providers noting that this will not automatically grant access. After logging in for the first
-                time an eSRC staff member will authorise your account and grant you access to the
-                resources you require.
+                authentication providers noting that this will not automatically grant access. A staff member needs to have
+                granted you access before you can login to an application.
                 </p>
             </div>
         </div>
@@ -125,7 +135,7 @@
             <div class="col-sm-12 col-md-12 col-lg-12">
                 <h5>Why are you here?</h5>
                 <p class="text-muted">The eScholarship Research Centre operates a number services on behalf of staff and collaborators. In order to
-                provide a unified experience across those services, a central single sign on service (this site) has been 
+                provide a unified experience across those services, a central sign on service (this site) has been 
                 developed. If you try to access an eSRC service and end up here you can confirm that this is the expected behaviour
                 by checking that the site you came from is shown at the top of the page.</p>
                 <p class="text-muted">After you've logged in successfully you will automatically be redirected to the service you came from so that you
