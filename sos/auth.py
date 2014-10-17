@@ -37,12 +37,12 @@ class LDAP:
                 break
             except ldap.SERVER_DOWN:
                 # try the next one
-                log.debug("Server down: %s" % s)
+                log.error("Server down: %s" % s)
                 self.conn = None
                 pass
             except ldap.LDAPError:
                 # it's not looking good love
-                log.debug("Error talking to: %s" % s)
+                log.error("Error talking to: %s" % s)
                 self.conn = None
 
     def authenticate(self, username, password):

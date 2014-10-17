@@ -42,18 +42,14 @@ def health_check(request):
     if ldap.conn is None:
         raise HTTPInternalServerError
 
-    # do we have a working connection to cassandra
-    db = mdb(request)
-
-    # add a trace into the health_check table
+    # do we have a working connection to mongo
     try:
-        doc = db.health_check.find_one({ 'name': 'hc' })
-        db.health_check.remove(doc['_id'])
+        db = mdb(request)
+        doc = db.health_check.find_one()
     except:
-        pass
-    db.health_check.insert({ 'name': 'hc' })
+        raise HTTPInternalServerError
 
-    log.info('Mongo cluster seems to be in working order.')
+    log.info('LDAP and Mongo cluster seem to be in working order.')
     return 'OK'
 
 @view_config(route_name='home', request_method="GET", renderer='templates/home.mak')
