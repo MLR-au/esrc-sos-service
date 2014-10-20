@@ -122,9 +122,10 @@ def login_staff(request):
         log.info("%s: User '%s' granted access to '%s'. " % (request.client_addr, request.POST['username'], request.session['r']))
         otc = create_session(request, user_data.username, user_data.fullname, user_data.email, user_data.groups)
         access_allowed(request, request.session['r'], otc)
-    else:
-        log.info("%s: User '%s' denied access to '%s'." % (request.client_addr, request.POST['username'], request.session['r']))
-        access_denied(request, request.session['r'])
+
+    # or ditch them
+    log.info("%s: User '%s' denied access to '%s'." % (request.client_addr, request.POST['username'], request.session['r']))
+    access_denied(request, request.session['r'])
 
 @view_config(context='velruse.providers.google_oauth2.GoogleAuthenticationComplete')
 def google_login_complete(request):
@@ -257,6 +258,7 @@ def access_denied(request, r):
 @view_config(context='velruse.AuthenticationDenied', renderer="denied.mak")
 def login_denied_view(request):
     log.info("%s: Social login denied." % request.client_addr)
+    request.session.invalidate()
     raise HTTPUnauthorized
 
 @view_config(route_name="retrieve_token", request_method="GET", renderer='json')
