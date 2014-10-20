@@ -57,36 +57,20 @@ def home(request):
     """The login page
 
     @method: GET
-    @params:
-    - GET: r - the redirect URL (the calling app)
-    - GET: e - whether the user login failed
-    
     """
-    # get the url params
-    #  if not r param: raise HTTPForbidden
-
-    #  validate the r param: raise HTTPForbidden if not in allowed list
-
-    # get the URL params; these will be blank if unset
-    r = request.GET.get('r')
-    e = request.GET.get('e')
-
-    if r == None:
-        log.error("%s: No redirect URL specified. Raising HTTPForbidden." % request.client_addr)
-        raise HTTPForbidden
-
     # is the redirecting app authorised? if not - redirect to home
-    verify_caller(request, r)
+    if request.session.get('r') is None:
+       request.session['r'] = request.referer
 
-    # store the name of the requested app - we need to redirect to it
-    request.session['r'] = r
+    referer = request.session['r']
+    verify_caller(request, referer)
 
     try:
         # if REMOTE_ADDR is not set in the environment then we have to wonder what the
         #  hell is going in. So - if we get an exception here, then the except clause
         #  is to raise a forbidden error.
-        log.info("%s: Login redirect from: '%s'" % (request.client_addr, r))
-        return { 'r': r, 'e': e }
+        log.info("%s: Login redirect from: '%s'" % (request.client_addr, referer))
+        return { 'r': referer, 'e': request.session.get('error') }
     except:
         log.error("%s: Something wrong. Raising HTTPForbidden just in case." % request.client_addr)
         raise HTTPForbidden
@@ -101,20 +85,14 @@ def login_staff(request):
     @params:
     - POST: username, 
     - POST: password
-    - POST: r
     """
     log.info("%s: Staff login attempted" % request.client_addr)
     if (not request.POST.get('username') or not request.POST.get('password')):
         log.error("%s: POST missing username and / or password." % request.client_addr)
         raise HTTPForbidden
 
-    if not request.POST.get('r'):
-        log.error("%s: POST missing redirect url." % request.client_addr)
-        raise HTTPForbidden
-    r = request.POST.get('r')
-
     # is the redirecting app authorised? if not - redirect to home
-    verify_caller(request, r)
+    verify_caller(request, request.session['r'])
 
     lc = request.registry.app_config['ldap']
     ldap = auth.LDAP(lc['servers'], lc['base'], lc['binduser'], lc['bindpass'])
@@ -125,7 +103,8 @@ def login_staff(request):
     #  to flag that something is wrong.
     if not result:
         log.error("%s: Login failed for: %s." % (request.client_addr, request.POST['username']))
-        raise HTTPFound("/?r=%s&e=True" % r)
+        request.session['error'] = True
+        raise HTTPFound("/")
 
     # if we get to here then the user has auth'ed successfully
     # grab the user data
@@ -133,73 +112,45 @@ def login_staff(request):
 
     # is the user actually allowed to access this app?
     allowed = False
-    app_groups_allowed = get_app_allow(request, r)
+    app_groups_allowed = get_app_allow(request, request.session['r'])
     for g in user_data.groups:
         if g in app_groups_allowed:
             allowed = True
 
     # handle the login
     if allowed:
-        log.info("%s: User '%s' granted access to '%s'. " % (request.client_addr, request.POST['username'], r))
+        log.info("%s: User '%s' granted access to '%s'. " % (request.client_addr, request.POST['username'], request.session['r']))
         otc = create_session(request, user_data.username, user_data.fullname, user_data.email, user_data.groups)
-        access_allowed(request, r, otc)
+        access_allowed(request, request.session['r'], otc)
     else:
-        log.info("%s: User '%s' denied access to '%s'." % (request.client_addr, request.POST['username'], r))
-        access_denied(request, r)
+        log.info("%s: User '%s' denied access to '%s'." % (request.client_addr, request.POST['username'], request.session['r']))
+        access_denied(request, request.session['r'])
 
 @view_config(context='velruse.providers.google_oauth2.GoogleAuthenticationComplete')
 def google_login_complete(request):
     session = request.session
     context = request.context
-    #for k, v in context.profile.items():
-    #    print k, v
 
     username = context.profile['verifiedEmail']
     fullname = context.profile['displayName']
-
-    # verify the user has a profile - raise forbidden otherwise
-    db = mdb(request)
-
-    log.info("%s: Google Login. Looking for profile with email '%s'" % (request.client_addr, username))
-    doc = db.profiles.find_one({ '$or': [
-        { 'primaryEmail': username }, { 'secondaryEmail': username }
-    ]})
-    if doc is None:
-        access_denied(request, request.session['r'])
-
-    # get app data
-    app = get_app_name(request, request.session['r'])
-
-    # if app is None - then a social user is trying to access the sign on service
-    #  management app and that's a no no.
-    if app is None:
-        access_denied(request, request.session['r'])
-
-    if doc['apps'][app] == 'allow':
-        # verify user allowed to use app - redirect to forbidden otherwise
-        # check user account not locked
-        if doc['status'] != 'locked':
-            # create session and get on with it
-            otc = create_session(request, username, fullname, username)
-            access_allowed(request, request.session['r'], otc)
-
-    # if we get to here for any reason - access has been denied
-    access_denied(request, request.session['r'])
+    log.info("%s: Google Login: '%s'" % (request.client_addr, username))
+    process_social_login(request, username, fullname)
 
 @view_config(context='velruse.providers.linkedin.LinkedInAuthenticationComplete')
 def linkedin_login_complete(request):
     session = request.session
     context = request.context
-    #for k, v in context.profile.items():
-    #    print k, v
 
     username = context.profile['emails'][0]['value']
     fullname = context.profile['name']['formatted']
+    log.info("%s: LinkedIn Login: '%s'" % (request.client_addr, username))
+    process_social_login(request, username, fullname)
 
+def process_social_login(request, username, fullname):
     # verify the user has a profile - raise forbidden otherwise
     db = mdb(request)
 
-    log.info("%s: LinkedIn Login. Looking for profile with email '%s'" % (request.client_addr, username))
+    log.info("%s: Looking for profile with email '%s'" % (request.client_addr, username))
     doc = db.profiles.find_one({ '$or': [
         { 'primaryEmail': username }, { 'secondaryEmail': username }
     ]})
@@ -294,11 +245,13 @@ def create_session(request, username, fullname, email, groups=None):
 def access_allowed(request, r, otc):
     login_callback = get_login_callback(request, r)
     log.info("%s: Returning one time code to: %s." % (request.client_addr, r))
+    request.session.invalidate()
     raise HTTPFound("%s/%s" % (login_callback, otc))
 
 def access_denied(request, r):
     log.info("%s: User not allowed to use this application: %s" % (request.client_addr, r))
     forbidden_callback = get_forbidden_callback(request, r)
+    request.session.invalidate()
     raise HTTPFound("%s" % (forbidden_callback))
 
 @view_config(context='velruse.AuthenticationDenied', renderer="denied.mak")
@@ -318,15 +271,23 @@ def retrieve_token(request):
     @returns
     - JSON Web Token
     """
+    # Is the caller allowed to use us?
+    referer = request.referer
+    verify_caller(request, referer)
+
+    # is there a JWT in the headers? if so - we need to unpack it
+    #  and augment ito
     # is the code valid?
+    try:
+        claims = verify_token(request)
+    except:
+        # no existing token...
+        claims = None
+
     code = request.matchdict.get('code')
     if code == None:
         log.error("%s: No code supplied. Raising HTTPUnauthorized" % request.client_addr)
         raise HTTPUnauthorized
-
-    # Is the caller allowed?
-    r = request.GET.get('r')
-    verify_caller(request, r)
 
     log.info("%s: Retrieve token for '%s'" % (request.client_addr, code))
 
@@ -365,24 +326,36 @@ def retrieve_token(request):
     private_key = RSA.importKey(private_key)
     #print dir(private_key)
 
-    admins = get_app_admins(request, r)
+    admins = get_app_admins(request, referer)
     is_admin = False
     if doc['groups'] is not None:
         for g in doc['groups']:
             if g in admins:
                 is_admin = True
 
-    user_data = {
-        'fullname': doc['fullname'],
+    apps = {}
+    if claims is not None:
+        apps = claims['apps']
+
+    print apps
+    apps[referer] = {
+        'admin': is_admin
+    }
+    user = {
+        'name': doc['fullname'],
         'email': doc['email'],
-        'admin': is_admin,
         'token': doc['token']
     }
+    user_data = {
+        'user': user,
+        'apps': apps
+    }
 
+    print user_data
 
     # generate the jwt
     session_lifetime = int(request.registry.app_config['general']['session.lifetime'])
-    log.info("%s: Creating JWT for '%s'." % (request.client_addr, user_data['fullname']))
+    log.info("%s: Creating JWT for '%s'." % (request.client_addr, user_data['user']['name']))
     token = jwt.generate_jwt(user_data, private_key, 'PS256', timedelta(seconds=session_lifetime))
 
     log.info("%s: Returning JWT." % request.client_addr)
@@ -402,7 +375,7 @@ def validate_token(request):
     # verify the token and session
     claims = verify_token(request)
 
-    log.info("%s: Token for '%s (%s)' valid. Session still ok." % (request.client_addr, claims['fullname'], claims['email']))
+    log.info("%s: Token for '%s (%s)' valid. Session is ok." % (request.client_addr, claims['user']['name'], claims['user']['email']))
     return { 'claims': claims }
 
 

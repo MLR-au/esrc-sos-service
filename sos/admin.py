@@ -30,7 +30,7 @@ def admin_check_email(request):
     """
     # verify the token and session
     claims = verify_token(request)
-    if not claims['admin']:
+    if not verify_admin(request.referer, claims):
         raise HTTPUnauthorised
 
     db = mdb(request)
@@ -54,7 +54,7 @@ def admin_users_get(request):
 
     # verify the token and session
     claims = verify_token(request)
-    if not claims['admin']:
+    if not verify_admin(request.referer, claims):
         raise HTTPUnauthorised
 
     db = mdb(request)
@@ -104,7 +104,7 @@ class AdminUserMgt:
     def __init__(self, request):
         # verify the token and session
         self.claims = verify_token(request)
-        if not self.claims['admin']:
+        if not verify_admin(request.referer, self.claims):
             raise HTTPUnauthorised
 
         self.request = request
@@ -184,7 +184,7 @@ class AdminUserMgt:
             doc = self.db.profiles.find_one({ '_id': ObjectId(user_id) })
             action = self.request.json_body.get('action')
             who = doc['username']
-            admin = self.claims['fullname']
+            admin = self.claims['user']['name']
 
             if action == 'lockAccount':
                 if doc['status'] == 'enabled':
@@ -260,7 +260,7 @@ class AdminUserMgt:
             user_id = self.request.matchdict.get('user')
             doc = self.db.profiles.find_one( { '_id': ObjectId(user_id) })
             who = doc['username']
-            admin = self.claims['fullname']
+            admin = self.claims['user']['name']
 
             log.info("'%s (%s)' account deleted ['%s']" % (who, user_id, admin))
 

@@ -79,7 +79,7 @@
                 %if r != '':
                     <p>You came from: <a href="${r}">${r}</a></p>
                 %endif
-                %if e == 'True':
+                %if e == True:
                     <div class="alert alert-danger small">Sorry - we couldn't log you in. Please try again.</div>
                 %endif
             </div>
@@ -93,7 +93,6 @@
             <div class="col-sm-6 col-md-6 col-lg-6" id="loginForms">
                 <h4 class="text-center">Login</h4>
                 <form role="form" action="/login/staff" method="POST">
-                    <input type="hidden" name="r" value="${r}" >
                     <div class="form-group">
                         <input type="username" name="username" class="form-control" placeholder="Enter your eSRC username" required autofocus>
                     </div>

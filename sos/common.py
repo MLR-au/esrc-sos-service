@@ -142,11 +142,14 @@ def verify_token(request):
     # grab a handle to the database
     db = mdb(request)
 
-    log.info("%s: Checking auth token for '%s (%s)' still valid." % (request.client_addr, claims['fullname'], claims['email']))
-    token = claims['token']
+    log.info("%s: Checking auth token for '%s (%s)' still valid." % (request.client_addr, claims['user']['name'], claims['user']['email']))
+    token = claims['user']['token']
     doc =  db.session.find_one({ 'token': token })
     if doc is None:
-        log.error("%s: No session found for '%s (%s)'. Raising HTTPUnauthorized." % (request.client_addr, claims['fullname'], claims['email']))
+        log.error("%s: No session found for '%s (%s)'. Raising HTTPUnauthorized." % (request.client_addr, claims['user']['name'], claims['user']['email']))
         raise HTTPUnauthorized
 
     return claims
+
+def verify_admin(referer, claims):
+    return claims['apps'][referer]['admin']
