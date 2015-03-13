@@ -67,7 +67,7 @@ class LDAP:
             ldap_filter = '(&(objectClass=Person)(uid=' + username + '))'
             data = self.conn.search_st(self.base, ldap.SCOPE_SUBTREE, ldap_filter, [ ], 0, timeout=self.LDAP_TIMEOUT)
         except:
-            print "**", sys.exc_info()
+            log.error(sys.exc_info())
 
         if data != []:
             dn = data[0][0]
@@ -103,7 +103,7 @@ class LDAP:
             ldap_filter = '(&(objectClass=posixGroup)(memberUid=' + username + '))'
             data = self.conn.search_st(self.base, ldap.SCOPE_SUBTREE, ldap_filter, [ 'cn' ], 0, timeout=self.LDAP_TIMEOUT)
         except:
-            print "**", sys.exc_info()
+            log.error(sys.exc_info())
 
         groups = [ g[1]['cn'][0] for g in data ] 
         return groups

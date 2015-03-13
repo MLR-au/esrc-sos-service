@@ -26,5 +26,5 @@ class MongoBackend:
             sys.exit()
         except OperationFailure:
             log.error("Can't connect to MongoDB at this time. Likely bad username / password.")
-            print sys.exc_info()[1]
+            log.error(sys.exc_info())
             sys.exit()

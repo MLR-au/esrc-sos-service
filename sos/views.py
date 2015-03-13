@@ -339,21 +339,19 @@ def retrieve_token(request):
     if claims is not None:
         apps = claims['apps']
 
-    print apps
     apps[referer] = {
         'admin': is_admin
     }
     user = {
         'name': doc['fullname'],
         'email': doc['email'],
-        'token': doc['token']
+        'token': doc['token'],
+        'groups': doc['groups']
     }
     user_data = {
         'user': user,
         'apps': apps
     }
-
-    print user_data
 
     # generate the jwt
     session_lifetime = int(request.registry.app_config['general']['session.lifetime'])

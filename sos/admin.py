@@ -241,7 +241,7 @@ class AdminUserMgt:
             return { 'userdata': doc }
 
         except:
-            print traceback.print_exc()
+            log.error(traceback.print_exc())
             raise HTTPInternalServerError
 
     @view_config(request_method='DELETE')
@@ -267,7 +267,7 @@ class AdminUserMgt:
             result = self.db.profiles.remove( { '_id': ObjectId(self.request.matchdict['user']) })
             return {}
         except:
-            print traceback.print_exc()
+            log.error(traceback.print_exc())
             raise HTTPInternalServerError
 
 
